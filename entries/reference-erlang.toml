@@ -1,0 +1,27 @@
+# One of the three clubs the challenge started from. Built before the rules
+# existed, so the cost is what its author remembers and the protocol numbers
+# were never recorded.
+reference = true
+handle = "macula-services"
+repo = "https://github.com/macula-services/mcl-bookclub"
+commit = "99ab03815c601694622714cd92bc5824534c010a"
+entered = 2026-11-14
+licence = "Apache-2.0"
+
+[build]
+language = "Erlang"
+stack = "OTP 28, evoq, reckon_db, sqlite, cowboy"
+harness = "OpenCode"
+models = ["DeepSeek v4"]
+
+[cost]
+usd = 2
+approximate = true
+basis = "billed"
+
+[result]
+doors = 22
+suite = "0.9.0"
+stranger = "pass"
+mesh = true
+notes = "Doors 11 and 24 shut: mcl-bookclub issues 18 and 16."

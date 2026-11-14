@@ -1,0 +1,25 @@
+# One of the three clubs the challenge started from. Built before the rules
+# existed, so the cost is what its author remembers and the protocol numbers
+# were never recorded.
+reference = true
+handle = "macula-services"
+repo = "https://github.com/macula-services/mcl-bookclub-gleam"
+commit = "a9f53531971f400e769472940f9425e2efae2af3"
+entered = 2026-11-14
+licence = "Apache-2.0"
+
+[build]
+language = "Gleam"
+stack = "OTP 28, evoq, reckon_db, sqlite, cowboy"
+harness = "OpenCode"
+models = ["DeepSeek v4"]
+
+[cost]
+usd = 17
+approximate = true
+basis = "billed"
+
+[result]
+stranger = "pass"
+mesh = true
+notes = "Doors not run."

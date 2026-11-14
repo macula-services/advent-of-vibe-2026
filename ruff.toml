@@ -1,0 +1,25 @@
+# The lint floor. CI fails by rule name; there are no baselines and no per-file ignores.
+line-length = 100
+target-version = "py311"
+preview = true
+
+[lint]
+explicit-preview-rules = true
+select = [
+    "E", "F", "W", "I", "B", "UP", "SIM", "RET", "PTH",
+    "C901",     # cyclomatic complexity
+    "PLR0912",  # branches
+    "PLR0915",  # statements
+    "PLR1702",  # nesting (preview)
+]
+
+[lint.mccabe]
+max-complexity = 9
+
+[lint.pylint]
+max-nested-blocks = 3
+max-branches = 9
+max-statements = 40
+
+[lint.isort]
+known-first-party = ["model_club", "open_doors", "stranger_test", "draw_table"]

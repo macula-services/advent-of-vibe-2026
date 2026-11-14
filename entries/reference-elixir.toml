@@ -1,0 +1,25 @@
+# One of the three clubs the challenge started from. Built before the rules
+# existed, so the cost is what its author remembers and the protocol numbers
+# were never recorded.
+reference = true
+handle = "macula-services"
+repo = "https://github.com/macula-services/mcl-bookclub-phoenix"
+commit = "a8c126d24580d8c4d88b75902e57b2e6cc4908ea"
+entered = 2026-11-14
+licence = "Apache-2.0"
+
+[build]
+language = "Elixir"
+stack = "Phoenix LiveView, evoq, reckon_db, sqlite"
+harness = "OpenCode"
+models = ["DeepSeek v4"]
+
+[cost]
+usd = 5
+approximate = true
+basis = "billed"
+
+[result]
+stranger = "pass"
+mesh = true
+notes = "Doors not run: this club has a LiveView page and no JSON door."
