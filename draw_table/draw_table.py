@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ENTRIES = REPO_ROOT / "entries"
 TABLE = REPO_ROOT / "TABLE.md"
 TEMPLATE = "TEMPLATE.toml"
-DOOR_COUNT = 24
+DESK_COUNT = 23
 COST_BASES = ("billed", "list-price", "local")
 STRANGER_RESULTS = ("pass", "fail")
 NOT_RECORDED = "not recorded"
@@ -86,10 +86,11 @@ UNDER_THE_RULES = {
     ("cost", "human_turns"): ("a count of 0 or more", _count),
     ("cost", "hand_written_lines"): ("a count of 0 or more", _count),
     ("cost", "attempts"): ("a count of 1 or more", lambda v: _count(v) and v >= 1),
-    ("result", "doors"): (
-        f"a count from 0 to {DOOR_COUNT}",
-        lambda v: _count(v) and v <= DOOR_COUNT,
+    ("result", "desks"): (
+        f"a count from 0 to {DESK_COUNT}",
+        lambda v: _count(v) and v <= DESK_COUNT,
     ),
+    ("result", "rebuilds"): ("true or false", _flag),
     ("result", "suite"): ("the suite version", _text),
     ("result", "evidence"): ("the evidence folder in the repo", _text),
 }
@@ -158,9 +159,14 @@ def cost(entry: Entry) -> str:
     return f"{about}${entry['cost']['usd']:,.2f}"
 
 
-def doors(entry: Entry) -> str:
-    opened = field(entry, "result", "doors")
-    return NOT_RUN if opened is None else f"{opened} of {DOOR_COUNT}"
+def desks(entry: Entry) -> str:
+    passed = field(entry, "result", "desks")
+    return NOT_RUN if passed is None else f"{passed} of {DESK_COUNT}"
+
+
+def rebuilds(entry: Entry) -> str:
+    rebuilt = field(entry, "result", "rebuilds")
+    return NOT_RUN if rebuilt is None else cell(rebuilt)
 
 
 def addons(entry: Entry) -> str:
@@ -169,17 +175,18 @@ def addons(entry: Entry) -> str:
 
 
 def is_complete(entry: Entry) -> bool:
-    every_door = field(entry, "result", "doors") == DOOR_COUNT
-    return every_door and field(entry, "result", "stranger") == "pass"
+    every_desk = field(entry, "result", "desks") == DESK_COUNT
+    rebuilt = field(entry, "result", "rebuilds") is True
+    return every_desk and rebuilt and field(entry, "result", "stranger") == "pass"
 
 
 def ranked(entries: list[Entry]) -> list[Entry]:
-    """Complete entries first, cheapest on top; then the rest, most doors first."""
+    """Complete entries first, cheapest on top; then the rest, most desks first."""
 
     def place(entry: Entry) -> tuple[int, float, float, str]:
-        opened = field(entry, "result", "doors") or 0
+        passed = field(entry, "result", "desks") or 0
         usd = entry["cost"]["usd"]
-        return (0, usd, 0, entry["handle"]) if is_complete(entry) else (1, -opened, usd, "")
+        return (0, usd, 0, entry["handle"]) if is_complete(entry) else (1, -passed, usd, "")
 
     return sorted(entries, key=place)
 
@@ -190,7 +197,18 @@ def rows(header: list[str], lines: list[list[str]]) -> list[str]:
 
 
 def main_table(entries: list[Entry]) -> list[str]:
-    header = ["#", "Who", "Language", "Stack", "Harness", "Models", "Add-ons", "Cost", "Doors"]
+    header = [
+        "#",
+        "Who",
+        "Language",
+        "Stack",
+        "Harness",
+        "Models",
+        "Add-ons",
+        "Cost",
+        "Desks",
+        "Rebuilds",
+    ]
     lines = [
         [
             str(place) if is_complete(entry) else "",
@@ -201,7 +219,8 @@ def main_table(entries: list[Entry]) -> list[str]:
             cell(entry["build"]["models"]),
             addons(entry),
             cost(entry),
-            doors(entry),
+            desks(entry),
+            rebuilds(entry),
         ]
         for place, entry in enumerate(entries, start=1)
     ]
@@ -264,7 +283,8 @@ def draw(entries: list[Entry]) -> str:
         "<!-- Drawn by draw_table/draw_table.py from entries/. Do not edit by hand. -->",
         "",
         "Every row is one book club, built by an AI agent, in a public repository. "
-        "A row with all 24 doors open and a passed stranger test is complete; "
+        f"A row is complete when all {DESK_COUNT} desks pass, the club rebuilds its read model "
+        "from the log, and the stranger test passes; "
         "complete rows are ranked by cost, cheapest first. "
         "[RULES.md](RULES.md) says what each number means.",
         "",

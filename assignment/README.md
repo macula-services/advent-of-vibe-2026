@@ -4,7 +4,7 @@
 
 A book club has members and books. Members read books. Now and then the club throws a party. One day the club closes.
 
-That is the whole business. This page gives it to you three ways: as a wall of sticky notes, as a table, and as the tree of folders the notes turn into. [DOORS.md](DOORS.md) says what each of the 24 doors checks, and [CONTRACT.md](CONTRACT.md) gives the HTTP routes and the JSON, field by field.
+That is the whole business. This page gives it to you three ways: as a wall of sticky notes, as a table, and as the tree of folders the notes turn into. [CHECKS.md](CHECKS.md) says what is checked, desk by desk, and [CONTRACT.md](CONTRACT.md) gives the HTTP routes and the JSON, field by field.
 
 ## The wall
 

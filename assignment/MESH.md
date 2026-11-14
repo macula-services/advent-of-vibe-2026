@@ -4,7 +4,7 @@
 
 A club's events are its own business. Three of them matter to the outside world, so the club publishes each of those as a **fact**: a message with a fixed public shape, on a named topic of the [Macula mesh](https://github.com/macula-io/macula). The pink notes on the wall are these three facts.
 
-Taking this track sets the `mesh` column of your row to yes. It opens no extra door, and a club without it is a complete entry.
+Taking this track sets the `mesh` column of your row to yes. It adds no check, and a club without it is a complete entry.
 
 ## The three facts
 

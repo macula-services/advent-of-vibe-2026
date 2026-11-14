@@ -20,8 +20,9 @@ approximate = true
 basis = "billed"
 
 [result]
-doors = 22
+desks = 22
+rebuilds = false
 suite = "0.9.0"
 stranger = "pass"
 mesh = true
-notes = "Doors 11 and 24 shut: mcl-bookclub issues 18 and 16."
+notes = "Fails reading_started_to_readings (mcl-bookclub issue 18) and the rebuild (issue 16)."

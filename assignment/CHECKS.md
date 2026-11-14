@@ -1,22 +1,22 @@
-# The 24 doors
+# What is checked
 
 *This exists so you know, before you build, exactly what "it works" means.*
 
-Each door is one desk of the club. The check suite knocks on each door by itself, with ids of its own, so door 13 can open while door 5 is still shut. The fields and the refusal words are in [CONTRACT.md](CONTRACT.md).
+The suite checks the club's 23 desks, each by itself and with ids of its own, so desk 13 can pass while desk 5 still fails. Then it checks that the club rebuilds its read model from the log. The fields and the refusal words are in [CONTRACT.md](CONTRACT.md).
 
 ```sh
-python3 open_doors/open_doors.py doors     # list them
-python3 open_doors/open_doors.py run       # doors 1 to 23, and the trace for door 24
-python3 open_doors/open_doors.py recheck   # door 24, after the restart
+python3 check_bookclub/check_bookclub.py desks     # list them
+python3 check_bookclub/check_bookclub.py run       # every desk, and the trace for the rebuild
+python3 check_bookclub/check_bookclub.py recheck   # the rebuild, after the restart
 ```
 
-`run` writes a witness file, `witness.json`: which doors opened, why the others did not, and the trace that door 24 is checked against. Commit it with your evidence.
+`run` writes a witness file, `witness.json`: which desks passed, why the others did not, and the trace the rebuild is checked against. Commit it with your evidence.
 
 ## Commands
 
-A command door opens when the club accepts the command with the right event and version, carries every field the contract names, mints a well-formed id when none is given, and refuses what it must refuse.
+A command desk passes when the club accepts the command with the right event and version, carries every field the contract names, mints a well-formed id when none is given, and refuses what it must refuse.
 
-| Door | Desk | Beyond the event, the club must refuse |
+| | Desk | Beyond the event, the club must refuse |
 |---|---|---|
 | 1 | `initiate_bookclub` | the same club twice (`already_initiated`); a body without a name |
 | 4 | `register_member` | the same member twice (`already_registered`); a body without a name. The event carries the club's name |
@@ -30,9 +30,9 @@ A command door opens when the club accepts the command with the right event and 
 
 ## Projections
 
-A projection door opens when, within the suite's patience, the row a reader gets shows what the event said.
+A projection desk passes when, within the suite's patience, the row a reader gets shows what the event said.
 
-| Door | Desk | The row shows |
+| | Desk | The row shows |
 |---|---|---|
 | 2 | `bookclub_initiated` to clubs | the club, `active`, with the moment from the event |
 | 5 | `member_registered` to members | the member, `active` |
@@ -45,7 +45,7 @@ A projection door opens when, within the suite's patience, the row a reader gets
 
 ## Questions
 
-| Door | Desk | Opens when |
+| | Desk | Passes when |
 |---|---|---|
 | 3 | `get_bookclub_by_id` | a known club is answered; an unknown one gets 404 `not_found` |
 | 6 | `get_member_by_id` | the same, for a member |
@@ -55,13 +55,13 @@ A projection door opens when, within the suite's patience, the row a reader gets
 
 ## The policy
 
-| Door | Desk | Opens when |
+| | Desk | Passes when |
 |---|---|---|
 | 17 | `on_member_registered_v1_maybe_plan_party` | five members registered in a row in a new club earn that club exactly one party |
 
 The suite cannot read your event log, so it counts parties the only way the contract allows: it plans one by hand and reads `parties_planned` in the answer.
 
-## Door 24: the log is the truth
+## The rebuild: the log is the truth
 
 Before the restart, the suite leaves a trace. It runs one club through its whole life: a member registers and reads a book to the end, the member leaves, the book is retired, the club is archived. It opens a second club, registers five members, and lets the policy plan their party. Then it writes down what a reader is told about each of them.
 
@@ -71,7 +71,7 @@ Now you restart:
 2. Delete the read model: the tables, the files, the cache, whatever your club answers questions from. Keep the event log.
 3. Start the club.
 
-`recheck` then knocks once more. The door opens when:
+`recheck` then asks again. The rebuild passes when:
 
 - every row the suite wrote down reads exactly as it did before the restart;
 - the archived club still refuses a party, the open club still refuses to be initiated again, its member still cannot register twice, and the finished reading still cannot be finished again;
@@ -80,7 +80,7 @@ Now you restart:
 If you can script the restart, one run does it all:
 
 ```sh
-python3 open_doors/open_doors.py run --restart-command ./restart_without_read_model.sh
+python3 check_bookclub/check_bookclub.py run --restart-command ./restart_without_read_model.sh
 ```
 
 The command must stop the club, delete the read model, start the club again and return.

@@ -5,9 +5,9 @@
 ## What you build
 
 1. **The book club of the [assignment](assignment/README.md).** Nine commands, eight projections, five questions, one policy, behind the [HTTP contract](assignment/CONTRACT.md).
-2. **Event sourced, with CQRS.** Every accepted command appends events to a log. The log is the only truth: the write side decides from it, and the read models are derived from it and can be thrown away. Door 24 checks this.
+2. **Event sourced, with CQRS.** Every accepted command appends events to a log. The log is the only truth: the write side decides from it, and the read models are derived from it and can be thrown away. The rebuild check tests this.
 3. **Vertical slices, names that scream.** One folder or file per desk, named after what the club does. No folders that sort code by technical kind (`services`, `controllers`, `models`, `handlers`, `utils` and their relatives). No event named after a row change (`created`, `updated`, `deleted`). The [stranger test](stranger_test/stranger_test.py) checks this.
-4. **Working software.** The [check suite](open_doors/open_doors.py) says how many of the 24 doors your club opens.
+4. **Working software.** The [check suite](check_bookclub/check_bookclub.py) says how many of the 23 desks pass and whether the club rebuilds its read model from the log.
 
 ## What you choose
 
@@ -31,7 +31,7 @@ In a public repository that you choose and control. The entry names one commit o
 
 Cost is the hard part to compare, so the rules are strict here.
 
-1. **The meter runs from the first prompt to the entered commit.** Everything the agent consumed on the way counts: planning, dead ends, retries, reviews by a second model, the runs that fixed the last shut door.
+1. **The meter runs from the first prompt to the entered commit.** Everything the agent consumed on the way counts: planning, dead ends, retries, reviews by a second model, the runs that fixed the last failing desk.
 2. **Started over? Count it all.** If you threw an attempt away and began again, the thrown-away attempts are part of the cost. `attempts` says how many there were.
 3. **Report the basis.**
    - `billed`: what the provider charged, from its usage export.
@@ -58,9 +58,9 @@ The evidence is what lets a stranger believe your row. Never commit a secret to 
 
 By anyone. The repository is public, the suite is one command, and the commit is named. A row that cannot be reproduced gets an issue in this repository, and an entry whose owner does not answer within two weeks is marked in its notes.
 
-The suite cannot see whether you really deleted the read model before door 24, or whether your cost export is complete. It does not have to. Your repository is public and your name is on the row.
+The suite cannot see whether you really deleted the read model before the rebuild check, or whether your cost export is complete. It does not have to. Your repository is public and your name is on the row.
 
-## The calendar
+## Dates
 
 - **1 December 2026.** The assignment and the suite are frozen as version 1.0.0. Until then they may still change, and entries are welcome as trial runs.
 - **6 January 2027.** The table is tagged `results-2026`. That tag is the result of this edition.
