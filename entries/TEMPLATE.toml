@@ -7,6 +7,7 @@ repo = "https://github.com/you/your-bookclub"   # public, and yours to control
 commit = "0000000000000000000000000000000000000000"   # the commit every number below is about
 entered = 2026-12-01
 licence = "Apache-2.0"   # any licence, or "none"
+run_with = "docker compose up"   # the one command that starts the club and its observer
 
 [build]
 language = "Rust"
@@ -25,10 +26,10 @@ hand_written_lines = 0  # lines of the entered commit that a person typed
 attempts = 1            # how many times you started over, this one included
 
 [result]
-desks = 0               # what check_bookclub.py printed: 0 to 23
+desks = 0               # what check_bookclub.py printed: 0 to 27
 rebuilds = false        # what it printed for "rebuilds from the log"
 suite = "1.0.0"         # check_bookclub.py --version
 stranger = "pass"       # what stranger_test.py printed: pass | fail
-mesh = false            # true if the club publishes its three facts on the Macula mesh
+mesh = false            # true if the three facts travel over the Macula mesh
 evidence = "vibe/"      # folder in your repo with the witness and the cost evidence
 notes = ""

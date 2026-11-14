@@ -1,8 +1,8 @@
 # The HTTP contract
 
-*This exists so one check suite can knock on every club, whatever it is written in.*
+*This exists so one check suite can knock on every club and every observer, whatever they are written in.*
 
-Your club listens on HTTP and speaks JSON. The suite's default address is `http://127.0.0.1:8488`; any address works with `--base-url`. There is no authentication: the club runs on your own machine while it is checked.
+Your club listens on HTTP and speaks JSON. The suite's default address is `http://127.0.0.1:8488`; any address works with `--base-url`. Your observer does the same on `http://127.0.0.1:8489`, or wherever `--observer-url` says. There is no authentication: both run on your own machine while they are checked.
 
 ## The rules that hold everywhere
 
@@ -159,3 +159,62 @@ Parties have no read model. The number of parties is told only in the answer to 
 | `GET /api/books/:book_id` | the book's row, or 404 |
 | `GET /api/readings/:reading_id` | the reading's row, or 404 |
 | `GET /api/members/:member_id/readings` | a JSON array of that member's reading rows, oldest `started_at` first; `[]` when there are none or the member is unknown |
+
+## The three facts
+
+Three of the club's events matter to the outside world. For each of them the club publishes a **fact**.
+
+| When the club records | It publishes the fact | With these fields |
+|---|---|---|
+| `member_registered_v1` | `member_registered`, version 1 | `member_id`, `club_id`, `club_name`, `name`, `registered_at` |
+| `book_procured_v1` | `book_procured`, version 1 | `book_id`, `club_id`, `club_name`, `title`, `author`, `procured_at` |
+| `book_retired_v1` | `book_retired`, version 1 | `book_id`, `club_id`, `club_name`, `title`, `author`, `procured_at`, `retired_by`, `retired_at` |
+
+- A fact is not the event. It is a separate message with its own shape, chosen for readers outside the club. Each fact carries the club's name as well as its id, so a reader needs nothing else to understand it.
+- One emitter per fact, named after it: `emit_member_registered` and so on.
+- A fact is published once. A club that restarts and replays its log does not tell the world again what it already told.
+- How a fact travels is yours to choose. The suite never looks at a fact on its way. It looks at what the observer made of it.
+
+## The observer
+
+The observer is a service of its own. It knows the club only through the three facts, and through one question it asks the club to verify what it heard.
+
+### `GET /api/scoreboard`
+
+Answers `200` with:
+
+```json
+{
+  "members": 3,
+  "books_on_shelf": 2,
+  "books_retired": 1,
+  "clubs": [
+    {
+      "club_id": "bookclub-…",
+      "club_name": "The Crooked Shelf",
+      "members": 3,
+      "last_registered": {"name": "Cy", "registered_at": 1794619235229},
+      "books_on_shelf": 2,
+      "books_retired": 1,
+      "bookclub_verified": "yes"
+    }
+  ]
+}
+```
+
+| Field | What it holds |
+|---|---|
+| `members`, `books_on_shelf`, `books_retired` (top) | the totals over everything the observer has heard |
+| `clubs` | one row per club that has at least one member, sorted by `club_id` |
+| `club_name` | the club's name, as the facts gave it |
+| `members` | how many `member_registered` facts named this club |
+| `last_registered` | the `name` and `registered_at` of the member with the latest `registered_at` |
+| `books_on_shelf` | the club's books that were procured and not retired |
+| `books_retired` | the club's books that were retired |
+| `bookclub_verified` | `"yes"` when the club itself knows this club (`GET /api/clubs/:club_id` on the club answers `200`), `"no"` when it does not |
+
+A retired book stays retired, whatever arrives later: facts can arrive out of order or twice.
+
+Leaving a club is not one of the three facts, so the observer never hears of it: a member who unregistered still counts.
+
+**The observer catches up.** A fact may reach the scoreboard a moment after its command was accepted. The suite waits for it with the same patience as for a read model.

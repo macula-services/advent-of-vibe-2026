@@ -10,19 +10,21 @@ Why the difference? The language? The libraries? The model's training? Luck? Thr
 
 Build the same book club, in any language you like, with an AI agent doing the building. Then tell everyone what it cost.
 
-You choose the language, the stack, the harness, the model or models, and any add-ons. Each of those is a column in [the table](TABLE.md). Three things are fixed:
+There are five rules:
 
 1. **It is event sourced, with CQRS.** The log of events is the truth. Everything a reader sees is derived from it.
-2. **It is sliced vertically and its names scream.** One folder per thing the club can do. A stranger reads what the system does from the folder names alone.
-3. **It works.** A check suite talks to your running club over HTTP and checks every desk, one by one.
+2. **It has an observer.** The club tells the outside world three facts. A second service sees only those facts and keeps a scoreboard from them. You build both.
+3. **It is sliced vertically and its names scream.** One folder per thing the system can do. A stranger reads what it does from the folder names alone.
+4. **The language and the supporting services are yours.** So are the harness, the models and anything else that helps. Each choice is a column in [the table](TABLE.md).
+5. **One command starts it.** A compose file, or another mechanism of your choosing.
 
-Your club lives in a public repository that you choose and control. Your result is public. Using the Macula mesh is optional.
+Your club lives in a public repository that you choose and control. Your result is public. [RULES.md](RULES.md) has the rules in full.
 
 There is no jury and no prize. There is a table, and every row in it can be checked by anyone with one command.
 
 ## What gets checked
 
-The club has 23 desks. A desk is one thing the club can do, one event written down for readers, or one question answered. The suite checks each desk by itself, so a half-built club still gets a count.
+A check suite talks to your running club and observer over HTTP. It checks 27 desks: 23 belong to the club and 4 to the observer. A desk is one thing the system can do, one event written down for readers, or one question answered. The suite checks each desk by itself, so a half-built club still gets a count.
 
 | | Desk | Kind |
 |---|---|---|
@@ -49,6 +51,10 @@ The club has 23 desks. A desk is one thing the club can do, one event written do
 | 21 | `book_retired` to books | projection |
 | 22 | `archive_bookclub` | command |
 | 23 | `bookclub_archived` to clubs | projection |
+| 24 | `ingest_member_registered` | observer |
+| 25 | `ingest_book_procured` | observer |
+| 26 | `ingest_book_retired` | observer |
+| 27 | `get_scoreboard` | observer |
 
 Then comes the check that tells an event-sourced system from one that only looks like it. Stop the club. Throw its read model away. Start it again. Every answer is back, the club still refuses what it refused before, and nothing happened twice. The table calls this **rebuilds**: yes or no.
 
@@ -69,7 +75,7 @@ When the agent is done, three things are left for you:
 You can check a club yourself at any time:
 
 ```sh
-python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488
+python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488 --observer-url http://127.0.0.1:8489
 # stop your club, delete its read model, start it again
 python3 check_bookclub/check_bookclub.py recheck --base-url http://127.0.0.1:8488
 python3 stranger_test/stranger_test.py path/to/your/checkout
@@ -82,8 +88,8 @@ An unfinished club is a welcome entry. Fourteen desks for forty cents is a resul
 | Folder | What it holds |
 |---|---|
 | [`AGENTS.md`](AGENTS.md) | The brief for the coding agent: one sentence from you is enough |
-| [`assignment/`](assignment/README.md) | The book club: the wall, what is checked, the HTTP contract, the optional mesh track |
-| [`check_bookclub/`](check_bookclub/) | The check suite: one command against a running club |
+| [`assignment/`](assignment/README.md) | The book club and its observer: the wall, what is checked, the HTTP contract, the three facts |
+| [`check_bookclub/`](check_bookclub/) | The check suite: one command against a running club and observer |
 | [`stranger_test/`](stranger_test/) | The structure check: reads the folder and file names of a checkout |
 | [`entries/`](entries/) | One file per entry, and the template to copy |
 | [`draw_table/`](draw_table/) | Draws [TABLE.md](TABLE.md) from the entries |
@@ -94,7 +100,7 @@ All three tools are plain Python 3.11 or newer, standard library only. Nothing t
 
 It is small enough to hold in your head and large enough to go wrong in every way that matters. It has four things with a life of their own (a club, a member, a book, a reading), each with a beginning and an end. It has a rule that reaches from one to another (every fifth member earns the club a party). It has four read models and five questions. An agent that gets this right has shown it can do event sourcing, CQRS and vertical slicing, not only talk about them.
 
-The three clubs the table starts with are public: [Erlang](https://github.com/macula-services/mcl-bookclub), [Elixir](https://github.com/macula-services/mcl-bookclub-phoenix), [Gleam](https://github.com/macula-services/mcl-bookclub-gleam). You may read them, and so may your agent, as long as your entry says so.
+The three clubs the table starts with are public: [Erlang](https://github.com/macula-services/mcl-bookclub), [Elixir](https://github.com/macula-services/mcl-bookclub-phoenix), [Gleam](https://github.com/macula-services/mcl-bookclub-gleam). The Erlang club's observer is [mcl-bookclub-observer](https://github.com/macula-services/mcl-bookclub-observer). Read them, and let your agent read them.
 
 ## Licence
 

@@ -66,10 +66,16 @@ class AnEntry(unittest.TestCase):
         reference = template()
         reference["reference"] = True
         for section, name in draw_table.UNDER_THE_RULES:
-            del reference[section][name]
+            del (reference[section] if section else reference)[name]
         self.assertEqual(draw_table.problems(reference), [])
         del reference["cost"]["usd"]
         self.assertEqual(len(draw_table.problems(reference)), 1)
+
+
+class TheDeskCount(unittest.TestCase):
+    def test_the_template_names_the_number_of_desks_the_suite_checks(self) -> None:
+        said = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn(f"printed: 0 to {draw_table.DESK_COUNT}\n", said)
 
 
 class TheRanking(unittest.TestCase):

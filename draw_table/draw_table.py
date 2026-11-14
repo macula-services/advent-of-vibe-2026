@@ -7,13 +7,14 @@ pull request whose table and entries disagree fails by name.
     draw_table.py            write TABLE.md
     draw_table.py --check    fail if an entry is ill-formed or TABLE.md is stale
 
-Python standard library only.
+Python standard library only. The number of desks is the suite's own.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import importlib.util
 import re
 import sys
 import tomllib
@@ -24,13 +25,26 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ENTRIES = REPO_ROOT / "entries"
 TABLE = REPO_ROOT / "TABLE.md"
 TEMPLATE = "TEMPLATE.toml"
-DESK_COUNT = 23
+SUITE = REPO_ROOT / "check_bookclub" / "check_bookclub.py"
+SUITE_MODULE = "the_check_suite"
 COST_BASES = ("billed", "list-price", "local")
 STRANGER_RESULTS = ("pass", "fail")
 NOT_RECORDED = "not recorded"
 NOT_RUN = "not run"
 
 Entry = dict[str, Any]
+
+
+def suite_desk_count() -> int:
+    """How many desks the suite checks: asked of the suite, never restated here."""
+    spec = importlib.util.spec_from_file_location(SUITE_MODULE, SUITE)
+    suite = importlib.util.module_from_spec(spec)
+    sys.modules[SUITE_MODULE] = suite
+    spec.loader.exec_module(suite)
+    return suite.DESK_COUNT
+
+
+DESK_COUNT = suite_desk_count()
 
 
 def _text(value: Any) -> bool:
@@ -80,6 +94,7 @@ ALWAYS = {
 }
 # An entry under the rules needs these too; the three reference clubs predate them.
 UNDER_THE_RULES = {
+    ("", "run_with"): ("the one command that starts the club and its observer", _text),
     ("build", "addons"): ("a list, [] for none", _texts),
     ("cost", "tokens"): ("a count of 0 or more", _count),
     ("cost", "agent_minutes"): ("a count of 0 or more", _count),
@@ -237,6 +252,7 @@ def fine_print(entries: list[Entry]) -> list[str]:
         "Hand-written lines",
         "Attempts",
         "Suite",
+        "Runs with",
         "Stranger test",
         "Mesh",
         "Licence",
@@ -259,6 +275,7 @@ def fine_print(entries: list[Entry]) -> list[str]:
                 )
             ),
             cell(field(entry, "result", "suite")),
+            cell(field(entry, "", "run_with")),
             cell(entry["result"]["stranger"]),
             cell(entry["result"]["mesh"]),
             cell(entry["licence"]),
@@ -282,9 +299,10 @@ def draw(entries: list[Entry]) -> str:
         "",
         "<!-- Drawn by draw_table/draw_table.py from entries/. Do not edit by hand. -->",
         "",
-        "Every row is one book club, built by an AI agent, in a public repository. "
-        f"A row is complete when all {DESK_COUNT} desks pass, the club rebuilds its read model "
-        "from the log, and the stranger test passes; "
+        "Every row is one book club and its observer, built by an AI agent, "
+        "in a public repository. "
+        f"A row is complete when all {DESK_COUNT} desks pass, the club rebuilds its "
+        "read model from the log, and the stranger test passes; "
         "complete rows are ranked by cost, cheapest first. "
         "[RULES.md](RULES.md) says what each number means.",
         "",

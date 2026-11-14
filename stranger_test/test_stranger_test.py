@@ -9,18 +9,32 @@ from pathlib import Path
 import stranger_test
 
 EVERYTHING_A_STRANGER_LOOKS_FOR = (
-    len(stranger_test.COMMANDS) + len(stranger_test.QUERIES) + len(stranger_test.PROJECTIONS) + 1
+    len(stranger_test.COMMANDS)
+    + len(stranger_test.QUERIES)
+    + len(stranger_test.PROJECTIONS)
+    + len((stranger_test.POLICY,))
+    + len(stranger_test.FACTS) * len((stranger_test.EMIT, stranger_test.INGEST))
+    + len((stranger_test.SCOREBOARD,))
 )
+CLUB = [
+    *stranger_test.COMMANDS,
+    *stranger_test.QUERIES,
+    *(f"{event}_v1_to_{table}" for event, table in stranger_test.PROJECTIONS),
+    "on_member_registered_v1_maybe_plan_party",
+    *(f"emit_{fact}_v1_to_mesh" for fact in stranger_test.FACTS),
+]
+OBSERVER = [
+    *(f"ingest_{fact}" for fact in stranger_test.FACTS),
+    stranger_test.SCOREBOARD,
+]
 
 
 def a_club_that_screams(root: Path, style: str = "snake") -> None:
-    """One folder per command, one file per projection, question and policy."""
-    names = [
-        *stranger_test.COMMANDS,
-        *stranger_test.QUERIES,
-        *(f"{event}_v1_to_{table}" for event, table in stranger_test.PROJECTIONS),
-        "on_member_registered_v1_maybe_plan_party",
-    ]
+    """One folder per desk of the club and of its observer, in one checkout."""
+    folders(root, CLUB + OBSERVER, style)
+
+
+def folders(root: Path, names: list[str], style: str = "snake") -> None:
     for name in names:
         (root / "src" / spelled(name, style)).mkdir(parents=True)
 
@@ -77,6 +91,39 @@ class TheStrangerTest(unittest.TestCase):
             ["no file or folder says that book_retired is projected to books"],
         )
 
+    def test_a_fact_that_does_not_leave_the_club_is_named(self) -> None:
+        a_club_that_screams(self.root)
+        (self.root / "src" / "emit_book_retired_v1_to_mesh").rmdir()
+        self.assertEqual(
+            stranger_test.findings(self.root),
+            ["no file or folder says that the club emits book_retired"],
+        )
+
+    def test_a_missing_observer_desk_is_named(self) -> None:
+        a_club_that_screams(self.root)
+        (self.root / "src" / "ingest_book_procured").rmdir()
+        (self.root / "src" / stranger_test.SCOREBOARD).rmdir()
+        self.assertEqual(
+            stranger_test.findings(self.root),
+            [
+                "no file or folder is named after the observer's desk ingest_book_procured",
+                "no file or folder is named after the question get_scoreboard",
+            ],
+        )
+
+    def test_a_club_and_an_observer_kept_apart_are_read_as_one(self) -> None:
+        club, observer = self.root / "club", self.root / "observer"
+        folders(club, CLUB)
+        folders(observer, OBSERVER)
+        self.assertEqual(len(stranger_test.findings(club)), len(OBSERVER))
+        self.assertEqual(stranger_test.findings(club, observer), [])
+        self.assertEqual(stranger_test.main([str(club), str(observer)]), 0)
+        (observer / "src" / "services").mkdir()
+        self.assertEqual(
+            stranger_test.findings(club, observer),
+            ["src/services/ sorts code by technical kind"],
+        )
+
     def test_a_layer_folder_fails(self) -> None:
         a_club_that_screams(self.root)
         for layer in sorted(stranger_test.LAYER_FOLDERS):
@@ -112,6 +159,7 @@ class TheStrangerTest(unittest.TestCase):
 
     def test_a_path_that_is_not_a_folder_is_refused(self) -> None:
         self.assertEqual(stranger_test.main([str(self.root / "nowhere")]), 2)
+        self.assertEqual(stranger_test.main([str(self.root), str(self.root / "nowhere")]), 2)
 
 
 if __name__ == "__main__":

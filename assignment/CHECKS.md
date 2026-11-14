@@ -2,7 +2,7 @@
 
 *This exists so you know, before you build, exactly what "it works" means.*
 
-The suite checks the club's 23 desks, each by itself and with ids of its own, so desk 13 can pass while desk 5 still fails. Then it checks that the club rebuilds its read model from the log. The fields and the refusal words are in [CONTRACT.md](CONTRACT.md).
+The suite checks 27 desks, 23 in the club and 4 in the observer, each by itself and with ids of its own, so desk 13 can pass while desk 5 still fails. Then it checks that the club rebuilds its read model from the log. The fields and the refusal words are in [CONTRACT.md](CONTRACT.md).
 
 ```sh
 python3 check_bookclub/check_bookclub.py desks     # list them
@@ -61,6 +61,19 @@ A projection desk passes when, within the suite's patience, the row a reader get
 
 The suite cannot read your event log, so it counts parties the only way the contract allows: it plans one by hand and reads `parties_planned` in the answer.
 
+## The observer
+
+An observer desk passes when, within the suite's patience, the scoreboard shows what the club's facts said. Each desk opens a club of its own and registers a member in it, so the club has a row.
+
+| | Desk | Passes when |
+|---|---|---|
+| 24 | `ingest_member_registered` | after a second member registers, the club's row shows its name, 2 members, and the second member as the last registered |
+| 25 | `ingest_book_procured` | after two books are procured, the row shows 2 books on the shelf and none retired |
+| 26 | `ingest_book_retired` | after one of two books is retired, the row shows 1 on the shelf and 1 retired |
+| 27 | `get_scoreboard` | the row says the club is verified (`"yes"`), the clubs are sorted by `club_id`, and the three totals are integers no smaller than what the rows add up to |
+
+The suite cannot see how a fact travelled. It sees only that the observer, a separate service, came to know it.
+
 ## The rebuild: the log is the truth
 
 Before the restart, the suite leaves a trace. It runs one club through its whole life: a member registers and reads a book to the end, the member leaves, the book is retired, the club is archived. It opens a second club, registers five members, and lets the policy plan their party. Then it writes down what a reader is told about each of them.
@@ -83,6 +96,6 @@ If you can script the restart, one run does it all:
 python3 check_bookclub/check_bookclub.py run --restart-command ./restart_without_read_model.sh
 ```
 
-The command must stop the club, delete the read model, start the club again and return.
+The command must stop the club, delete the read model, start the club again and return. The observer is left running.
 
 A club that keeps its state in one mutable table has nothing to rebuild from and fails here. So does a club whose projections depend on the order in which two of them happen to run, and a club whose policy cannot tell a replayed event from a new one.

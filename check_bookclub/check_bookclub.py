@@ -265,7 +265,7 @@ def party(club: Club, club_id: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# The club's 23 desks, in the order they are built
+# The club's desks, in the order they are built
 # ---------------------------------------------------------------------------
 
 

@@ -3,6 +3,7 @@ and each planted defect fails the checks it should and no others."""
 
 from __future__ import annotations
 
+import re
 import tempfile
 import threading
 import unittest
@@ -12,6 +13,9 @@ import check_bookclub
 import model_club
 
 PATIENCE_SECONDS = 0.5
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# the ways a page states how many desks there are
+DESK_COUNT_STATED = (r"\b(\d+) desks\b", r"desks: \d+ of (\d+)", r"\d+ of (\d+) desks")
 
 COMMANDS = {1, 4, 7, 10, 13, 16, 18, 20, 22}
 PROJECTIONS = {2, 5, 8, 11, 14, 19, 21, 23}
@@ -124,6 +128,19 @@ class TheDesks(unittest.TestCase):
 
     def test_every_defect_the_model_offers_has_an_expectation(self) -> None:
         self.assertLessEqual(set(model_club.DEFECTS), set(FAILED_BY_DEFECT))
+
+
+class ThePages(unittest.TestCase):
+    def test_every_page_that_counts_the_desks_counts_what_the_suite_checks(self) -> None:
+        pages = [*REPO_ROOT.glob("*.md"), *REPO_ROOT.glob("assignment/*.md")]
+        stated = {
+            (page.name, int(count))
+            for page in pages
+            for pattern in DESK_COUNT_STATED
+            for count in re.findall(pattern, page.read_text(encoding="utf-8"))
+        }
+        self.assertIn(("README.md", check_bookclub.DESK_COUNT), stated)
+        self.assertEqual({count for _, count in stated}, {check_bookclub.DESK_COUNT}, stated)
 
 
 class ASoundClub(unittest.TestCase):
