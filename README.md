@@ -54,19 +54,26 @@ Then comes the check that tells an event-sourced system from one that only looks
 
 ## Taking part
 
-1. Read the [assignment](assignment/README.md): the club on one wall of sticky notes, [what is checked](assignment/CHECKS.md) and the [HTTP contract](assignment/CONTRACT.md).
-2. Read the [rules](RULES.md), above all how cost is counted, before your agent writes its first line.
-3. Let your agent build the club in your own public repository.
-4. Check it:
+Tell your coding agent one sentence:
 
-   ```sh
-   python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488
-   # stop your club, delete its read model, start it again
-   python3 check_bookclub/check_bookclub.py recheck --base-url http://127.0.0.1:8488
-   python3 stranger_test/stranger_test.py path/to/your/checkout
-   ```
+> Check macula-services/advent-of-vibe-2026 and macula-services/mcl-bookclub, and build a clone of the book club in Rust from it.
 
-5. Add your row: one file in `entries/`, by pull request. [CONTRIBUTING.md](CONTRIBUTING.md) walks you through it.
+Put your own language where it says Rust. That sentence is the whole brief: [AGENTS.md](AGENTS.md) tells the agent what to read, what to build, how to check its own work, and what evidence to leave behind.
+
+When the agent is done, three things are left for you:
+
+1. Make the repository public.
+2. Fill in what only you know in `vibe/entry.toml`: what it cost, how many tokens, how often you had to step in. [RULES.md](RULES.md) says how cost is counted.
+3. Add your row: copy that file into `entries/` here, by pull request. [CONTRIBUTING.md](CONTRIBUTING.md) walks you through it.
+
+You can check a club yourself at any time:
+
+```sh
+python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488
+# stop your club, delete its read model, start it again
+python3 check_bookclub/check_bookclub.py recheck --base-url http://127.0.0.1:8488
+python3 stranger_test/stranger_test.py path/to/your/checkout
+```
 
 An unfinished club is a welcome entry. Fourteen desks for forty cents is a result too.
 
@@ -74,6 +81,7 @@ An unfinished club is a welcome entry. Fourteen desks for forty cents is a resul
 
 | Folder | What it holds |
 |---|---|
+| [`AGENTS.md`](AGENTS.md) | The brief for the coding agent: one sentence from you is enough |
 | [`assignment/`](assignment/README.md) | The book club: the wall, what is checked, the HTTP contract, the optional mesh track |
 | [`check_bookclub/`](check_bookclub/) | The check suite: one command against a running club |
 | [`stranger_test/`](stranger_test/) | The structure check: reads the folder and file names of a checkout |

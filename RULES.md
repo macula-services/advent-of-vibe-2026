@@ -49,8 +49,11 @@ Your repository carries a folder, `vibe/` unless your entry says otherwise, with
 
 - the witness file the check suite wrote (`witness.json`);
 - the provider's usage or cost export, or a screenshot of it, with keys and account numbers removed;
-- the first prompt you gave the agent, word for word;
-- the rules files, skills and templates the agent was given, or links to them.
+- the first prompt you gave the agent, word for word (`FIRST_PROMPT.md`);
+- what the agent was given or read: rules files, skills, templates, repositories (`INPUTS.md`);
+- the entry file as the agent filled it (`entry.toml`).
+
+An agent that follows [AGENTS.md](AGENTS.md) leaves all of these behind except the cost export.
 
 The evidence is what lets a stranger believe your row. Never commit a secret to it.
 
