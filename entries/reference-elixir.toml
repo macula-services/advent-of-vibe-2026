@@ -22,4 +22,4 @@ basis = "billed"
 [result]
 stranger = "pass"
 mesh = true
-notes = "Doors not run: this club has a LiveView page and no JSON door."
+notes = "Not run: this club has a LiveView page and no JSON API."

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Open the doors: check a running book club against the Advent of Vibe 2026 assignment.
+"""Check a running book club against the Advent of Vibe 2026 assignment.
 
 This exists so anyone can prove, with one command, that their book club does
 what the assignment asks. It talks HTTP to a club that is already running and
 knows nothing about the language the club is written in.
 
-    open_doors.py run --base-url http://127.0.0.1:8488
+    check_bookclub.py run --base-url http://127.0.0.1:8488
     (stop the club, throw its read model away, start it again)
-    open_doors.py recheck --base-url http://127.0.0.1:8488
+    check_bookclub.py recheck --base-url http://127.0.0.1:8488
 
 Python standard library only.
 """
@@ -29,8 +29,6 @@ from pathlib import Path
 from typing import Any
 
 SUITE_VERSION = "0.9.0"
-DOOR_COUNT = 24
-LAST_DOOR = DOOR_COUNT
 DEFAULT_BASE_URL = "http://127.0.0.1:8488"
 DEFAULT_WITNESS = "witness.json"
 DEFAULT_PATIENCE_SECONDS = 5.0
@@ -51,8 +49,8 @@ PAGES_READ = 304
 NOT_FOUND = {"ok": False, "error": "not_found"}
 
 
-class Shut(Exception):
-    """A door stays shut; the message says what the club did instead."""
+class Failed(Exception):
+    """A check fails; the message says what the club did instead."""
 
 
 @dataclass(frozen=True)
@@ -84,12 +82,12 @@ class Club:
             with error:
                 return Reply(error.code, _json_or_none(error.read()))
         except OSError as error:
-            raise Shut(f"the club did not answer {request.full_url}: {error}") from error
+            raise Failed(f"the club did not answer {request.full_url}: {error}") from error
 
     def is_up(self) -> bool:
         try:
             self.get(f"/api/clubs/{new_id('bookclub')}")
-        except Shut:
+        except Failed:
             return False
         return True
 
@@ -102,13 +100,13 @@ def _json_or_none(raw: bytes) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# What a door expects of a reply
+# What a check expects of a reply
 # ---------------------------------------------------------------------------
 
 
 def expect(holds: bool, otherwise: str) -> None:
     if not holds:
-        raise Shut(otherwise)
+        raise Failed(otherwise)
 
 
 def new_id(prefix: str) -> str:
@@ -175,7 +173,7 @@ def answers(club: Club, route: str, **wanted: Any) -> dict[str, Any]:
         if reply.status == 200 and all(body.get(f) == v for f, v in wanted.items()):
             return body
         if time.monotonic() >= deadline:
-            raise Shut(f"GET {route}: wanted {wanted}, last answer {reply.status} {reply.body}")
+            raise Failed(f"GET {route}: wanted {wanted}, last answer {reply.status} {reply.body}")
         time.sleep(POLL_PAUSE_SECONDS)
 
 
@@ -186,7 +184,7 @@ def misses(club: Club, route: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Things a door needs before it can knock
+# Things a check needs before it can start
 # ---------------------------------------------------------------------------
 
 
@@ -259,7 +257,7 @@ def party(club: Club, club_id: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Doors 1 to 23: one desk each, in the order they are built
+# The 23 desks, in the order they are built
 # ---------------------------------------------------------------------------
 
 
@@ -577,7 +575,7 @@ def bookclub_archived_to_clubs(club: Club) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Door 24: the log is the truth
+# The rebuild: the log is the truth
 # ---------------------------------------------------------------------------
 
 
@@ -653,10 +651,10 @@ def the_log_is_the_truth(club: Club, trace: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# The calendar
+# The whole check
 # ---------------------------------------------------------------------------
 
-DESK_DOORS: tuple[Callable[[Club], None], ...] = (
+DESKS: tuple[Callable[[Club], None], ...] = (
     initiate_bookclub,
     bookclub_initiated_to_clubs,
     get_bookclub_by_id,
@@ -681,62 +679,69 @@ DESK_DOORS: tuple[Callable[[Club], None], ...] = (
     archive_bookclub,
     bookclub_archived_to_clubs,
 )
-DOOR_NAMES: tuple[str, ...] = (
-    *(door.__name__ for door in DESK_DOORS),
-    the_log_is_the_truth.__name__,
-)
+DESK_COUNT = len(DESKS)
+REBUILD = the_log_is_the_truth.__name__
 WAITS_FOR_RESTART = "not checked yet: restart the club without its read model, then run recheck"
 
 
-def knock(door: Callable[[], Any]) -> tuple[bool, str, Any]:
+def attempt(check: Callable[[], Any]) -> tuple[bool, str, Any]:
     try:
-        return True, "", door()
-    except Shut as shut:
-        return False, str(shut), None
+        return True, "", check()
+    except Failed as failed:
+        return False, str(failed), None
 
 
-def open_desk_doors(club: Club) -> dict[str, Any]:
-    """Doors 1 to 23, then the trace door 24 will be checked against."""
-    doors = {}
-    for number, door in enumerate(DESK_DOORS, start=1):
-        is_open, reason, _ = knock(lambda door=door: door(club))
-        doors[str(number)] = {"name": door.__name__, "open": is_open, "reason": reason}
-    has_trace, reason, trace = knock(lambda: leave_a_trace(club))
-    last = WAITS_FOR_RESTART if has_trace else f"no trace to check against: {reason}"
-    doors[str(LAST_DOOR)] = {"name": DOOR_NAMES[-1], "open": False, "reason": last}
+def check_desks(club: Club) -> dict[str, Any]:
+    """Every desk, then the trace the rebuild will be checked against."""
+    desks = {}
+    for number, desk in enumerate(DESKS, start=1):
+        passed, reason, _ = attempt(lambda desk=desk: desk(club))
+        desks[str(number)] = {"name": desk.__name__, "passed": passed, "reason": reason}
+    has_trace, reason, trace = attempt(lambda: leave_a_trace(club))
+    waiting = WAITS_FOR_RESTART if has_trace else f"no trace to check against: {reason}"
     return {
-        "suite": "advent-of-vibe-2026/open_doors",
+        "suite": "advent-of-vibe-2026/check_bookclub",
         "suite_version": SUITE_VERSION,
         "base_url": club.base_url,
         "ran_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "doors": doors,
+        "desks": desks,
+        "rebuild": {"name": REBUILD, "passed": False, "reason": waiting},
         "trace": trace,
     }
 
 
-def open_last_door(club: Club, witness: dict[str, Any]) -> dict[str, Any]:
-    """Door 24, against the trace an earlier run left in the witness."""
+def check_rebuild(club: Club, witness: dict[str, Any]) -> dict[str, Any]:
+    """The rebuild, against the trace an earlier run left in the witness."""
     trace = witness.get("trace")
     if trace is None:
         return witness
-    is_open, reason, _ = knock(lambda: the_log_is_the_truth(club, trace))
-    witness["doors"][str(LAST_DOOR)] = {"name": DOOR_NAMES[-1], "open": is_open, "reason": reason}
+    passed, reason, _ = attempt(lambda: the_log_is_the_truth(club, trace))
+    witness["rebuild"] = {"name": REBUILD, "passed": passed, "reason": reason}
     witness["rechecked_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     return witness
 
 
-def opened(witness: dict[str, Any]) -> int:
-    return sum(1 for door in witness["doors"].values() if door["open"])
+def desks_passed(witness: dict[str, Any]) -> int:
+    return sum(1 for desk in witness["desks"].values() if desk["passed"])
+
+
+def rebuilds(witness: dict[str, Any]) -> bool:
+    return witness["rebuild"]["passed"]
+
+
+def _line(label: str, check: dict[str, Any]) -> str:
+    mark = "pass" if check["passed"] else "FAIL"
+    reason = f"  {check['reason']}" if check["reason"] else ""
+    return f"{label:>7}  {mark}  {check['name']}{reason}"
 
 
 def report(witness: dict[str, Any]) -> str:
-    lines = []
-    for number, door in witness["doors"].items():
-        mark = "open" if door["open"] else "SHUT"
-        reason = f"  {door['reason']}" if door["reason"] else ""
-        lines.append(f"{int(number):>2}  {mark}  {door['name']}{reason}")
+    lines = [_line(number, desk) for number, desk in witness["desks"].items()]
+    lines.append(_line("rebuild", witness["rebuild"]))
+    rebuilt = "yes" if rebuilds(witness) else "no"
     lines.append(
-        f"opened {opened(witness)} of {DOOR_COUNT} doors (suite {witness['suite_version']})"
+        f"desks: {desks_passed(witness)} of {DESK_COUNT}, rebuilds from the log: {rebuilt} "
+        f"(suite {witness['suite_version']})"
     )
     return "\n".join(lines)
 
@@ -760,30 +765,31 @@ def _save(witness: dict[str, Any], path: Path) -> None:
 
 
 def _run(arguments: argparse.Namespace) -> int:
+    """Exit 0 when every desk passes, and the rebuild too if it was checked in this run."""
     club = Club(arguments.base_url, arguments.patience)
-    witness = open_desk_doors(club)
+    witness = check_desks(club)
     _save(witness, arguments.witness)
     if arguments.restart_command:
         restart_with(arguments.restart_command, club)
-        witness = open_last_door(club, witness)
+        witness = check_rebuild(club, witness)
         _save(witness, arguments.witness)
     print(report(witness))
-    waiting = 0 if arguments.restart_command else 1
-    return 0 if opened(witness) + waiting == DOOR_COUNT else 1
+    rebuild_holds = rebuilds(witness) or not arguments.restart_command
+    return 0 if desks_passed(witness) == DESK_COUNT and rebuild_holds else 1
 
 
 def _recheck(arguments: argparse.Namespace) -> int:
     club = Club(arguments.base_url, arguments.patience)
     witness = json.loads(arguments.witness.read_text(encoding="utf-8"))
-    witness = open_last_door(club, witness)
+    witness = check_rebuild(club, witness)
     _save(witness, arguments.witness)
     print(report(witness))
-    return 0 if opened(witness) == DOOR_COUNT else 1
+    return 0 if desks_passed(witness) == DESK_COUNT and rebuilds(witness) else 1
 
 
-def _doors(_arguments: argparse.Namespace) -> int:
-    for number, name in enumerate(DOOR_NAMES, start=1):
-        print(f"{number:>2}  {name}")
+def _desks(_arguments: argparse.Namespace) -> int:
+    for number, desk in enumerate(DESKS, start=1):
+        print(f"{number:>2}  {desk.__name__}")
     return 0
 
 
@@ -791,20 +797,20 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--version", action="version", version=SUITE_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
-    run = commands.add_parser("run", help="open doors 1 to 23 and leave a trace for door 24")
+    run = commands.add_parser("run", help="check every desk and leave a trace for the rebuild")
     run.add_argument(
         "--restart-command",
         help="a shell command that stops the club, removes its read model and starts it "
-        "again; with it, door 24 is checked in the same run",
+        "again; with it, the rebuild is checked in the same run",
     )
     run.set_defaults(action=_run)
-    recheck = commands.add_parser("recheck", help="open door 24 after the restart")
+    recheck = commands.add_parser("recheck", help="check the rebuild, after the restart")
     recheck.set_defaults(action=_recheck)
     for command in (run, recheck):
         command.add_argument("--base-url", default=DEFAULT_BASE_URL)
         command.add_argument("--witness", type=Path, default=Path(DEFAULT_WITNESS))
         command.add_argument("--patience", type=float, default=DEFAULT_PATIENCE_SECONDS)
-    commands.add_parser("doors", help="list the 24 doors").set_defaults(action=_doors)
+    commands.add_parser("desks", help="list the desks").set_defaults(action=_desks)
     return parser
 
 
@@ -812,8 +818,8 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     try:
         return arguments.action(arguments)
-    except Shut as shut:
-        print(f"stopped: {shut}", file=sys.stderr)
+    except Failed as failed:
+        print(f"stopped: {failed}", file=sys.stderr)
         return 1
 
 

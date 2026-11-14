@@ -18,11 +18,14 @@ def template() -> draw_table.Entry:
     return tomllib.loads(TEMPLATE.read_text(encoding="utf-8"))
 
 
-def entry(handle: str, usd: float, doors: int, stranger: str = "pass") -> draw_table.Entry:
+def entry(
+    handle: str, usd: float, desks: int, stranger: str = "pass", rebuilds: bool = True
+) -> draw_table.Entry:
     made = template()
     made["handle"] = handle
     made["cost"]["usd"] = usd
-    made["result"]["doors"] = doors
+    made["result"]["desks"] = desks
+    made["result"]["rebuilds"] = rebuilds
     made["result"]["stranger"] = stranger
     return made
 
@@ -45,7 +48,8 @@ class AnEntry(unittest.TestCase):
             ("cost", "basis"): "guessed",
             ("cost", "usd"): -1,
             ("cost", "attempts"): 0,
-            ("result", "doors"): draw_table.DOOR_COUNT + 1,
+            ("result", "desks"): draw_table.DESK_COUNT + 1,
+            ("result", "rebuilds"): "yes",
             ("result", "stranger"): "mostly",
             ("result", "mesh"): "yes",
             ("build", "models"): [],
@@ -70,23 +74,31 @@ class AnEntry(unittest.TestCase):
 
 class TheRanking(unittest.TestCase):
     def test_complete_entries_come_first_cheapest_on_top(self) -> None:
-        every = draw_table.DOOR_COUNT
+        every = draw_table.DESK_COUNT
         entries = [
-            entry("most-doors-unfinished", 1, every - 1),
+            entry("most-desks-unfinished", 1, every - 1),
+            entry("does-not-rebuild", 0.2, every, rebuilds=False),
             entry("dear", 9, every),
             entry("failed-the-stranger", 0.5, every, stranger="fail"),
             entry("cheap", 3, every),
-            entry("few-doors", 0.1, 4),
+            entry("few-desks", 0.1, 4),
         ]
         order = [made["handle"] for made in draw_table.ranked(entries)]
         self.assertEqual(
             order,
-            ["cheap", "dear", "failed-the-stranger", "most-doors-unfinished", "few-doors"],
+            [
+                "cheap",
+                "dear",
+                "does-not-rebuild",
+                "failed-the-stranger",
+                "most-desks-unfinished",
+                "few-desks",
+            ],
         )
 
     def test_only_complete_entries_get_a_place(self) -> None:
         drawn = draw_table.main_table(
-            draw_table.ranked([entry("cheap", 3, draw_table.DOOR_COUNT), entry("unfinished", 1, 5)])
+            draw_table.ranked([entry("cheap", 3, draw_table.DESK_COUNT), entry("unfinished", 1, 5)])
         )
         self.assertTrue(drawn[2].startswith("| 1 | "))
         self.assertTrue(drawn[3].startswith("|  | "))
@@ -94,23 +106,23 @@ class TheRanking(unittest.TestCase):
 
 class TheDrawing(unittest.TestCase):
     def test_a_note_cannot_break_its_row(self) -> None:
-        noted = entry("noted", 3, 24)
+        noted = entry("noted", 3, draw_table.DESK_COUNT)
         noted["result"]["notes"] = "one | two\nthree"
         row = draw_table.fine_print([noted])[2]
         self.assertIn("one \\| two three", row)
 
     def test_no_add_ons_reads_none_and_an_unrecorded_field_says_so(self) -> None:
-        plain = entry("plain", 3, 24)
+        plain = entry("plain", 3, draw_table.DESK_COUNT)
         self.assertEqual(draw_table.addons(plain), "none")
         unrecorded = copy.deepcopy(plain)
         del unrecorded["build"]["addons"]
         self.assertEqual(draw_table.addons(unrecorded), draw_table.NOT_RECORDED)
 
     def test_an_approximate_cost_is_marked(self) -> None:
-        about = entry("about", 2, 24)
+        about = entry("about", 2, draw_table.DESK_COUNT)
         about["cost"]["approximate"] = True
         self.assertEqual(draw_table.cost(about), "~$2.00")
-        self.assertEqual(draw_table.cost(entry("exact", 2, 24)), "$2.00")
+        self.assertEqual(draw_table.cost(entry("exact", 2, draw_table.DESK_COUNT)), "$2.00")
 
 
 class TheCheck(unittest.TestCase):

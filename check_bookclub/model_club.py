@@ -2,8 +2,8 @@
 """A model book club in one file, for testing the suite itself.
 
 This exists so the suite can be shown to catch a broken club: the model can be
-started with a named defect, and the suite's own tests assert which door stays
-shut. It is NOT an entry and not an example to copy: one file holding every
+started with a named defect, and the suite's own tests assert which check
+fails. It is NOT an entry and not an example to copy: one file holding every
 desk is exactly what the assignment forbids.
 
     model_club.py --port 8488 --log club.log [--defect no_party_policy]
@@ -369,7 +369,7 @@ PROJECTIONS: dict[str, Callable[[Tables, dict[str, Any]], None]] = {
 
 
 # ---------------------------------------------------------------------------
-# The HTTP door
+# HTTP
 # ---------------------------------------------------------------------------
 
 
@@ -398,7 +398,7 @@ def read(model: ModelClub, route: str) -> tuple[int, Any]:
 
 
 def _handler(model: ModelClub) -> type[BaseHTTPRequestHandler]:
-    class Door(BaseHTTPRequestHandler):
+    class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
             raw = self.rfile.read(int(self.headers.get("content-length") or 0))
             try:
@@ -423,7 +423,7 @@ def _handler(model: ModelClub) -> type[BaseHTTPRequestHandler]:
         def log_message(self, *_: Any) -> None:
             pass
 
-    return Door
+    return Handler
 
 
 def serve(model: ModelClub, port: int) -> ThreadingHTTPServer:

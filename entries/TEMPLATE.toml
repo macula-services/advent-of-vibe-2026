@@ -25,8 +25,9 @@ hand_written_lines = 0  # lines of the entered commit that a person typed
 attempts = 1            # how many times you started over, this one included
 
 [result]
-doors = 0               # what open_doors.py printed: 0 to 24
-suite = "1.0.0"         # open_doors.py --version
+desks = 0               # what check_bookclub.py printed: 0 to 23
+rebuilds = false        # what it printed for "rebuilds from the log"
+suite = "1.0.0"         # check_bookclub.py --version
 stranger = "pass"       # what stranger_test.py printed: pass | fail
 mesh = false            # true if the club publishes its three facts on the Macula mesh
 evidence = "vibe/"      # folder in your repo with the witness and the cost evidence

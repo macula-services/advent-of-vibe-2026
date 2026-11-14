@@ -22,4 +22,4 @@ basis = "billed"
 [result]
 stranger = "pass"
 mesh = true
-notes = "Doors not run."
+notes = "Not run."

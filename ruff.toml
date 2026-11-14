@@ -22,4 +22,4 @@ max-branches = 9
 max-statements = 40
 
 [lint.isort]
-known-first-party = ["model_club", "open_doors", "stranger_test", "draw_table"]
+known-first-party = ["model_club", "check_bookclub", "stranger_test", "draw_table"]

@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 RUFF_VERSION="0.17.1"
-TOOLS=(open_doors stranger_test draw_table)
+TOOLS=(check_bookclub stranger_test draw_table)
 
 ruff_pinned() {
   if command -v ruff >/dev/null && [ "$(ruff --version)" = "ruff $RUFF_VERSION" ]; then

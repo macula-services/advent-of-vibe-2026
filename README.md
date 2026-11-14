@@ -14,17 +14,17 @@ You choose the language, the stack, the harness, the model or models, and any ad
 
 1. **It is event sourced, with CQRS.** The log of events is the truth. Everything a reader sees is derived from it.
 2. **It is sliced vertically and its names scream.** One folder per thing the club can do. A stranger reads what the system does from the folder names alone.
-3. **It works.** A check suite knocks on 24 doors over HTTP. Your club opens them or it does not.
+3. **It works.** A check suite talks to your running club over HTTP and checks every desk, one by one.
 
 Your club lives in a public repository that you choose and control. Your result is public. Using the Macula mesh is optional.
 
 There is no jury and no prize. There is a table, and every row in it can be checked by anyone with one command.
 
-## The 24 doors
+## What gets checked
 
-An advent calendar has 24 doors. So does the book club: one door per desk, in the order you would build them. A desk is one thing the club can do, one event written down, or one question answered.
+The club has 23 desks. A desk is one thing the club can do, one event written down for readers, or one question answered. The suite checks each desk by itself, so a half-built club still gets a count.
 
-| Door | Desk | Kind |
+| | Desk | Kind |
 |---|---|---|
 | 1 | `initiate_bookclub` | command |
 | 2 | `bookclub_initiated` to clubs | projection |
@@ -49,34 +49,33 @@ An advent calendar has 24 doors. So does the book club: one door per desk, in th
 | 21 | `book_retired` to books | projection |
 | 22 | `archive_bookclub` | command |
 | 23 | `bookclub_archived` to clubs | projection |
-| 24 | the log is the truth | restart |
 
-Door 24 is the one that tells an event-sourced system from one that only looks like it. Stop the club. Throw its read model away. Start it again. Every answer is back, the club still refuses what it refused before, and nothing happened twice.
+Then comes the check that tells an event-sourced system from one that only looks like it. Stop the club. Throw its read model away. Start it again. Every answer is back, the club still refuses what it refused before, and nothing happened twice. The table calls this **rebuilds**: yes or no.
 
 ## Taking part
 
-1. Read the [assignment](assignment/README.md): the club on one wall of sticky notes, the [24 doors](assignment/DOORS.md) and the [HTTP contract](assignment/CONTRACT.md).
+1. Read the [assignment](assignment/README.md): the club on one wall of sticky notes, [what is checked](assignment/CHECKS.md) and the [HTTP contract](assignment/CONTRACT.md).
 2. Read the [rules](RULES.md), above all how cost is counted, before your agent writes its first line.
 3. Let your agent build the club in your own public repository.
 4. Check it:
 
    ```sh
-   python3 open_doors/open_doors.py run --base-url http://127.0.0.1:8488
+   python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488
    # stop your club, delete its read model, start it again
-   python3 open_doors/open_doors.py recheck --base-url http://127.0.0.1:8488
+   python3 check_bookclub/check_bookclub.py recheck --base-url http://127.0.0.1:8488
    python3 stranger_test/stranger_test.py path/to/your/checkout
    ```
 
 5. Add your row: one file in `entries/`, by pull request. [CONTRIBUTING.md](CONTRIBUTING.md) walks you through it.
 
-An unfinished club is a welcome entry. Fourteen doors for forty cents is a result too.
+An unfinished club is a welcome entry. Fourteen desks for forty cents is a result too.
 
 ## What is in this repository
 
 | Folder | What it holds |
 |---|---|
-| [`assignment/`](assignment/README.md) | The book club: the wall, the doors, the HTTP contract, the optional mesh track |
-| [`open_doors/`](open_doors/) | The check suite: one command against a running club |
+| [`assignment/`](assignment/README.md) | The book club: the wall, what is checked, the HTTP contract, the optional mesh track |
+| [`check_bookclub/`](check_bookclub/) | The check suite: one command against a running club |
 | [`stranger_test/`](stranger_test/) | The structure check: reads the folder and file names of a checkout |
 | [`entries/`](entries/) | One file per entry, and the template to copy |
 | [`draw_table/`](draw_table/) | Draws [TABLE.md](TABLE.md) from the entries |
