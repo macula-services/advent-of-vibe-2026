@@ -28,6 +28,8 @@ PARTY_EVERY = 5
 NOT_FOUND = {"ok": False, "error": "not_found"}
 UNKNOWN_ROUTE = {"error": "not_found"}
 MISSING = "missing_required_fields"
+# never a real start, so the defect shows however fast the machine is
+FORGOTTEN_MOMENT = 0
 
 # kind of dossier: the event that opens it, the event that ends it, and the
 # three refusals (not opened yet, opened already, ended).
@@ -282,15 +284,14 @@ def finish_reading(model: ModelClub, params: dict[str, Any]) -> tuple[str, dict[
     if not isinstance(pages, int) or isinstance(pages, bool) or pages < 0:
         raise Refused("invalid_params")
     born = model.dossier("reading", reading_id)[0]
-    finished_at = now_ms()
     event = {
         "event_type": "reading_finished_v1",
         **echo(born, "reading_id", "member_id", "book_id", "started_at"),
         "pages_read": pages,
-        "finished_at": finished_at,
+        "finished_at": now_ms(),
     }
     if model.has("finish_forgets_started_at"):
-        event["started_at"] = finished_at
+        event["started_at"] = FORGOTTEN_MOMENT
     return reading_id, event
 
 
