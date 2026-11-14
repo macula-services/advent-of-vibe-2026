@@ -6,7 +6,7 @@ The three facts and their fields are part of the [contract](CONTRACT.md#the-thre
 
 The reference club carries them over the [Macula mesh](https://github.com/macula-io/macula). On the mesh a fact is a message on a named topic, and any system in the realm can listen, not only the observer you built. This page says how the reference does it, for those who want the same.
 
-Carrying the facts over the mesh sets the `mesh` column of your row to yes. It adds no check, and it is not needed for a complete entry.
+If you carry the facts over the mesh, your row says so in its `fact_carrier` column. It adds no check, and it is not needed for a complete entry.
 
 ## The topics
 

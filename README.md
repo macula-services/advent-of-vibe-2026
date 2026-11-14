@@ -1,26 +1,30 @@
 # Advent of Vibe 2026
 
-*This exists so anyone can find out, in public, what it costs an AI agent to build the same small system in the language of their choice.*
+*This exists so anyone can look up, in one public datasheet, what it costs an AI agent to build the same small system with a given language, model, harness and set of services.*
 
 An AI agent built a book club in Erlang for about two dollars. The same club in Elixir cost about five. In Gleam it cost about seventeen. Same design, same harness, same model: [OpenCode](https://opencode.ai) with DeepSeek v4.
 
 Why the difference? The language? The libraries? The model's training? Luck? Three rows cannot say. A hundred rows can.
 
-## The challenge
+So this is a measurement, and you are invited to add to it. Which formula builds a well-defined application for the least: which language, with which model, in which harness, on which services, hosted or on your own hardware?
 
-Build the same book club, in any language you like, with an AI agent doing the building. Then tell everyone what it cost.
+## The measurement
+
+Build the same book club, with an AI agent doing the building and a formula of your choosing. Then add what it cost as one row of [the datasheet](DATASHEET.csv).
+
+The datasheet is the point. It has one row per run and one column per choice, and it is a plain file: load it into a spreadsheet, sort it, filter it, draw your own conclusions. [The table](TABLE.md) is its short form, cheapest complete run first.
 
 There are five rules:
 
 1. **It is event sourced, with CQRS.** The log of events is the truth. Everything a reader sees is derived from it.
 2. **It has an observer.** The club tells the outside world three facts. A second service sees only those facts and keeps a scoreboard from them. You build both.
 3. **It is sliced vertically and its names scream.** One folder per thing the system can do. A stranger reads what it does from the folder names alone.
-4. **The language and the supporting services are yours.** So are the harness, the models and anything else that helps. Each choice is a column in [the table](TABLE.md).
+4. **The language and the supporting services are yours.** So are the harness, the models and anything else that helps. Each choice is a column in the datasheet.
 5. **One command starts it.** A compose file, or another mechanism of your choosing.
 
 Your club lives in a public repository that you choose and control. Your result is public. [RULES.md](RULES.md) has the rules in full.
 
-There is no jury and no prize. There is a table, and every row in it can be checked by anyone with one command.
+Nobody is judged. The contest, if there is one, is between formulas. Every row can be checked by anyone with one command.
 
 ## What gets checked
 
@@ -72,6 +76,8 @@ When the agent is done, three things are left for you:
 2. Fill in what only you know in `vibe/entry.toml`: what it cost, how many tokens, how often you had to step in. [RULES.md](RULES.md) says how cost is counted.
 3. Add your row: copy that file into `entries/` here, by pull request. [CONTRIBUTING.md](CONTRIBUTING.md) walks you through it.
 
+Ran the same formula twice? Add both. One run is an anecdote, and several show how much is luck.
+
 You can check a club yourself at any time:
 
 ```sh
@@ -91,8 +97,9 @@ An unfinished club is a welcome entry. Fourteen desks for forty cents is a resul
 | [`assignment/`](assignment/README.md) | The book club and its observer: the wall, what is checked, the HTTP contract, the three facts |
 | [`check_bookclub/`](check_bookclub/) | The check suite: one command against a running club and observer |
 | [`stranger_test/`](stranger_test/) | The structure check: reads the folder and file names of a checkout |
-| [`entries/`](entries/) | One file per entry, and the template to copy |
-| [`draw_table/`](draw_table/) | Draws [TABLE.md](TABLE.md) from the entries |
+| [`entries/`](entries/) | One file per run, and the template to copy |
+| [`DATASHEET.csv`](DATASHEET.csv) | Every run, every column: the data |
+| [`draw_table/`](draw_table/) | Draws the datasheet and [TABLE.md](TABLE.md) from the entries |
 
 All three tools are plain Python 3.11 or newer, standard library only. Nothing to install.
 

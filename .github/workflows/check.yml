@@ -1,6 +1,6 @@
 # Everything in check.sh, on every pull request and on main: the lint floor
 # (ruff, complexity, nesting, format), the three tools' own tests, and the
-# table against the entries.
+# datasheet and the table against the entries.
 
 name: check
 

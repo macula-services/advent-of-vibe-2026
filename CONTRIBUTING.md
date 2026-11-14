@@ -15,12 +15,16 @@
 
 3. Put `witness.json` and your cost evidence in the `vibe/` folder of your repository and commit. That commit is the one you enter.
 4. Fork this repository. Copy `entries/TEMPLATE.toml` to `entries/<your-handle>-<language>.toml` and fill it in.
-5. Redraw the table: `python3 draw_table/draw_table.py`
-6. Open a pull request with those two files: your entry and `TABLE.md`.
+5. Redraw the datasheet and the table: `python3 draw_table/draw_table.py`
+6. Open a pull request with those three files: your entry, `DATASHEET.csv` and `TABLE.md`.
 
-CI checks that your entry is well-formed and that the table matches the entries. A maintainer merges it. Nobody judges your code; your row says what the suite said.
+CI checks that your entry is well-formed and that the datasheet and the table match the entries. A maintainer merges it. Nobody judges your code; your row says what the suite said.
 
-You can enter the same club again after improving it: change the commit and the numbers in your file. You can enter a second club in another language: add a second file.
+Every run is a row. Ran the same formula again, or another formula? Add another file. Improved a club after entering it? Change the commit and the numbers in its file.
+
+## Using the data
+
+`DATASHEET.csv` is the whole measurement: one row per run, one column per choice, the cost and the result. Take it, analyse it, publish what you find. If your analysis needs a column that is not there, open an issue.
 
 ## Doubting a row
 

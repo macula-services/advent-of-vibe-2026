@@ -1,4 +1,4 @@
-# One of the three clubs the challenge started from. Built before the rules
+# One of the three clubs the measurement started from. Built before the rules
 # existed, so the cost is what its author remembers and the protocol numbers
 # were never recorded.
 reference = true
@@ -10,9 +10,18 @@ licence = "Apache-2.0"
 
 [build]
 language = "Erlang"
-stack = "OTP 28, evoq, reckon_db, sqlite, cowboy"
+frameworks = "OTP 28, evoq, cowboy"
 harness = "OpenCode"
 models = ["DeepSeek v4"]
+
+[services]
+event_store = "reckon_db"
+read_model_store = "sqlite"
+fact_carrier = "Macula mesh"
+other_services = []
+
+[environment]
+runs_on = "hosted"
 
 [cost]
 usd = 2
@@ -24,5 +33,4 @@ desks = 22
 rebuilds = false
 suite = "0.10.0"
 stranger = "pass"
-mesh = true
 notes = "Fails reading_started_to_readings (mcl-bookclub issue 18) and the rebuild (issue 16). The four observer desks fail too: the reference observer answers on the mesh only (mcl-bookclub-observer issue 12)."

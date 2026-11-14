@@ -1,6 +1,7 @@
-# One file per entry. Copy this file to entries/<your-handle>-<language>.toml,
+# One file per run. Copy this file to entries/<your-handle>-<language>.toml,
 # fill it in, and open a pull request that adds only that file and the redrawn
-# TABLE.md. RULES.md says what each number means.
+# DATASHEET.csv and TABLE.md. RULES.md says what each column means.
+# Ran the same formula again? Add a second file: every run is a row.
 
 handle = "your-github-handle"
 repo = "https://github.com/you/your-bookclub"   # public, and yours to control
@@ -11,10 +12,21 @@ run_with = "docker compose up"   # the one command that starts the club and its 
 
 [build]
 language = "Rust"
-stack = "axum, sqlite, an event log of my own"
+frameworks = "axum, tokio"
 harness = "OpenCode"
 models = ["DeepSeek v4"]
+provider = "DeepSeek"   # who served the models: the vendor, a reseller, or "self" for your own machine
 addons = []   # MCP servers, skills, rules files, templates, plugins; [] for none
+
+[services]
+event_store = "an event log of my own, in sqlite"   # what keeps the event log
+read_model_store = "sqlite"                         # what keeps the read models
+fact_carrier = "NATS"                               # what carries the three facts to the observer
+other_services = []                                 # anything else that must run; [] for none
+
+[environment]
+runs_on = "hosted"   # where the models ran: hosted | local | both
+hardware = "laptop, 8 cores, 32 GB"   # the machine the work ran on; for a local model, its GPU too
 
 [cost]
 usd = 0.00              # everything the agent consumed, first prompt to the entered commit
@@ -30,6 +42,5 @@ desks = 0               # what check_bookclub.py printed: 0 to 27
 rebuilds = false        # what it printed for "rebuilds from the log"
 suite = "1.0.0"         # check_bookclub.py --version
 stranger = "pass"       # what stranger_test.py printed: pass | fail
-mesh = false            # true if the three facts travel over the Macula mesh
 evidence = "vibe/"      # folder in your repo with the witness and the cost evidence
 notes = ""

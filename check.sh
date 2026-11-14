@@ -22,6 +22,6 @@ for TOOL in "${TOOLS[@]}"; do
   echo "== tests: $TOOL"
   python3 -m unittest discover --buffer --start-directory "$TOOL" --pattern 'test_*.py'
 done
-echo "== the table matches the entries"
+echo "== the datasheet and the table match the entries"
 python3 draw_table/draw_table.py --check
 echo "all checks passed"
