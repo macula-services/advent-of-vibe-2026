@@ -6,6 +6,7 @@ can run on a checkout, in any language, and not a matter of taste. It reads
 file and folder names only, never file contents.
 
     stranger_test.py path/to/checkout
+    stranger_test.py path/to/club path/to/observer    two checkouts read as one
 
 Python standard library only.
 """
@@ -48,6 +49,12 @@ PROJECTIONS = (
     ("reading_finished", "readings"),
 )
 POLICY = ("on_member_registered", "plan_party")
+# what the club tells the outside world, and the word that says it leaves the club
+FACTS = ("member_registered", "book_procured", "book_retired")
+EMIT = "emit"
+# the observer: one desk per fact it takes in, and the one question it answers
+INGEST = "ingest"
+SCOREBOARD = "get_scoreboard"
 
 # Folders that sort code by technical kind instead of by what the club does.
 LAYER_FOLDERS = frozenset({
@@ -126,6 +133,23 @@ def missing_desks(names: list[str]) -> list[str]:
     ]
     if not any(all(squash(part) in name for part in POLICY) for name in names):
         findings.append(f"no file or folder is named after the policy {'_maybe_'.join(POLICY)}")
+    return findings + missing_fact_desks(names)
+
+
+def missing_fact_desks(names: list[str]) -> list[str]:
+    """Where each fact leaves the club, where the observer takes it in, and its question."""
+    findings = [
+        f"no file or folder says that the club emits {fact}"
+        for fact in FACTS
+        if not any(squash(EMIT + fact) in name for name in names)
+    ]
+    findings += [
+        f"no file or folder is named after the observer's desk {INGEST}_{fact}"
+        for fact in FACTS
+        if not any(squash(INGEST + fact) in name for name in names)
+    ]
+    if not any(squash(SCOREBOARD) in name for name in names):
+        findings.append(f"no file or folder is named after the question {SCOREBOARD}")
     return findings
 
 
@@ -139,10 +163,10 @@ def _projects(name: str, event: str, table: str) -> bool:
     return bool(found) and "to" in after and after.endswith(table)
 
 
-def layer_folders(root: Path, paths: list[Path]) -> list[str]:
+def layer_folders(placed: list[tuple[Path, Path]]) -> list[str]:
     return [
         f"{path}/ sorts code by technical kind"
-        for path in paths
+        for root, path in placed
         if (root / path).is_dir() and squash(path.name) in LAYER_FOLDERS
     ]
 
@@ -156,20 +180,24 @@ def row_words(paths: list[Path]) -> list[str]:
     ]
 
 
-def findings(root: Path) -> list[str]:
-    paths = list(own_paths(root))
+def findings(*roots: Path) -> list[str]:
+    """Several checkouts are read as one code base: a club and an observer kept apart."""
+    placed = [(root, path) for root in roots for path in own_paths(root)]
+    paths = [path for _, path in placed]
     names = [squash(path.stem) for path in paths]
-    return missing_desks(names) + layer_folders(root, paths) + row_words(paths)
+    return missing_desks(names) + layer_folders(placed) + row_words(paths)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("checkout", type=Path, help="the root of the code base to read")
+    parser.add_argument("checkout", type=Path, nargs="+", help="the root of the code base to read")
     arguments = parser.parse_args(argv)
-    if not arguments.checkout.is_dir():
-        print(f"not a folder: {arguments.checkout}", file=sys.stderr)
+    not_folders = [checkout for checkout in arguments.checkout if not checkout.is_dir()]
+    for checkout in not_folders:
+        print(f"not a folder: {checkout}", file=sys.stderr)
+    if not_folders:
         return 2
-    found = findings(arguments.checkout)
+    found = findings(*arguments.checkout)
     for finding in found:
         print(f"FAIL  {finding}")
     print(f"stranger test: {'fail' if found else 'pass'} ({len(found)} findings)")

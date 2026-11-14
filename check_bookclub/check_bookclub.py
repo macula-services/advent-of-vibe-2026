@@ -2,10 +2,10 @@
 """Check a running book club against the Advent of Vibe 2026 assignment.
 
 This exists so anyone can prove, with one command, that their book club does
-what the assignment asks. It talks HTTP to a club that is already running and
-knows nothing about the language the club is written in.
+what the assignment asks. It talks HTTP to a club and an observer that are
+already running and knows nothing about the language they are written in.
 
-    check_bookclub.py run --base-url http://127.0.0.1:8488
+    check_bookclub.py run --base-url http://127.0.0.1:8488 --observer-url http://127.0.0.1:8489
     (stop the club, throw its read model away, start it again)
     check_bookclub.py recheck --base-url http://127.0.0.1:8488
 
@@ -28,8 +28,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SUITE_VERSION = "0.9.0"
+SUITE_VERSION = "0.10.0"
 DEFAULT_BASE_URL = "http://127.0.0.1:8488"
+DEFAULT_OBSERVER_URL = "http://127.0.0.1:8489"
+SCOREBOARD = "/api/scoreboard"
 DEFAULT_WITNESS = "witness.json"
 DEFAULT_PATIENCE_SECONDS = 5.0
 REQUEST_TIMEOUT_SECONDS = 10.0
@@ -60,11 +62,17 @@ class Reply:
 
 
 class Club:
-    """The running club, reached over HTTP."""
+    """The running club, and the observer that watches it, reached over HTTP."""
 
-    def __init__(self, base_url: str, patience: float) -> None:
+    def __init__(
+        self, base_url: str, patience: float, observer_url: str = DEFAULT_OBSERVER_URL
+    ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.observer_url = observer_url.rstrip("/")
         self.patience = patience
+
+    def scoreboard(self) -> Reply:
+        return self._send(urllib.request.Request(self.observer_url + SCOREBOARD))
 
     def post(self, route: str, payload: dict[str, Any]) -> Reply:
         data = json.dumps(payload).encode()
@@ -257,7 +265,7 @@ def party(club: Club, club_id: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# The 23 desks, in the order they are built
+# The club's desks, in the order they are built
 # ---------------------------------------------------------------------------
 
 
@@ -575,6 +583,84 @@ def bookclub_archived_to_clubs(club: Club) -> None:
 
 
 # ---------------------------------------------------------------------------
+# The observer's four desks: a second service that only sees the club's facts
+# ---------------------------------------------------------------------------
+
+
+def _board_row(reply: Reply, club_id: str) -> dict[str, Any] | None:
+    body = reply.body if isinstance(reply.body, dict) else {}
+    clubs = body.get("clubs") if reply.status == 200 else None
+    rows = clubs if isinstance(clubs, list) else []
+    return next((r for r in rows if isinstance(r, dict) and r.get("club_id") == club_id), None)
+
+
+def on_the_board(club: Club, club_id: str, **wanted: Any) -> dict[str, Any]:
+    """The observer catches up: its scoreboard lists the club with the wanted fields."""
+    deadline = time.monotonic() + club.patience
+    while True:
+        reply = club.scoreboard()
+        row = _board_row(reply, club_id)
+        if row is not None and all(row.get(f) == v for f, v in wanted.items()):
+            return row
+        if time.monotonic() >= deadline:
+            seen = row if row is not None else f"{reply.status}, club not listed"
+            raise Failed(f"GET {SCOREBOARD}: wanted club {club_id} with {wanted}, last: {seen}")
+        time.sleep(POLL_PAUSE_SECONDS)
+
+
+def a_club_with_a_member(club: Club) -> tuple[str, dict[str, Any]]:
+    club_id = initiated(club)["club_id"]
+    seen_by_readers(club, club_id)
+    return club_id, registered(club, club_id)
+
+
+def ingest_member_registered(club: Club) -> None:
+    club_id, _ = a_club_with_a_member(club)
+    time.sleep(ORDER_PAUSE_SECONDS)
+    latest = registered(club, club_id, "Cy")
+    on_the_board(
+        club,
+        club_id,
+        club_name=CLUB_NAME,
+        members=2,
+        last_registered={"name": "Cy", "registered_at": latest["registered_at"]},
+    )
+
+
+def ingest_book_procured(club: Club) -> None:
+    club_id, _ = a_club_with_a_member(club)
+    for _ in range(2):
+        procured(club, club_id)
+    on_the_board(club, club_id, members=1, books_on_shelf=2, books_retired=0)
+
+
+def ingest_book_retired(club: Club) -> None:
+    club_id, _ = a_club_with_a_member(club)
+    procured(club, club_id)
+    retired(club, procured(club, club_id)["book_id"])
+    on_the_board(club, club_id, books_on_shelf=1, books_retired=1)
+
+
+def get_scoreboard(club: Club) -> None:
+    club_id, _ = a_club_with_a_member(club)
+    procured(club, club_id)
+    on_the_board(club, club_id, members=1, books_on_shelf=1, bookclub_verified="yes")
+    board = club.scoreboard().body
+    rows = board["clubs"]
+    ids = [row.get("club_id") for row in rows]
+    expect(ids == sorted(ids), f"GET {SCOREBOARD}: wanted the clubs sorted by club_id")
+    for total in ("members", "books_on_shelf", "books_retired"):
+        listed = sum(row.get(total, 0) for row in rows)
+        is_count = isinstance(board.get(total), int) and not isinstance(board.get(total), bool)
+        expect(
+            is_count, f"GET {SCOREBOARD}: wanted {total} as an integer, got {board.get(total)!r}"
+        )
+        expect(
+            board[total] >= listed, f"GET {SCOREBOARD}: {total} is less than its clubs add up to"
+        )
+
+
+# ---------------------------------------------------------------------------
 # The rebuild: the log is the truth
 # ---------------------------------------------------------------------------
 
@@ -678,6 +764,10 @@ DESKS: tuple[Callable[[Club], None], ...] = (
     book_retired_to_books,
     archive_bookclub,
     bookclub_archived_to_clubs,
+    ingest_member_registered,
+    ingest_book_procured,
+    ingest_book_retired,
+    get_scoreboard,
 )
 DESK_COUNT = len(DESKS)
 REBUILD = the_log_is_the_truth.__name__
@@ -703,6 +793,7 @@ def check_desks(club: Club) -> dict[str, Any]:
         "suite": "advent-of-vibe-2026/check_bookclub",
         "suite_version": SUITE_VERSION,
         "base_url": club.base_url,
+        "observer_url": club.observer_url,
         "ran_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "desks": desks,
         "rebuild": {"name": REBUILD, "passed": False, "reason": waiting},
@@ -766,7 +857,7 @@ def _save(witness: dict[str, Any], path: Path) -> None:
 
 def _run(arguments: argparse.Namespace) -> int:
     """Exit 0 when every desk passes, and the rebuild too if it was checked in this run."""
-    club = Club(arguments.base_url, arguments.patience)
+    club = Club(arguments.base_url, arguments.patience, arguments.observer_url)
     witness = check_desks(club)
     _save(witness, arguments.witness)
     if arguments.restart_command:
@@ -808,6 +899,7 @@ def _parser() -> argparse.ArgumentParser:
     recheck.set_defaults(action=_recheck)
     for command in (run, recheck):
         command.add_argument("--base-url", default=DEFAULT_BASE_URL)
+        command.add_argument("--observer-url", default=DEFAULT_OBSERVER_URL)
         command.add_argument("--witness", type=Path, default=Path(DEFAULT_WITNESS))
         command.add_argument("--patience", type=float, default=DEFAULT_PATIENCE_SECONDS)
     commands.add_parser("desks", help="list the desks").set_defaults(action=_desks)

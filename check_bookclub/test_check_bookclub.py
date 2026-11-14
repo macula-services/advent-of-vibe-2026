@@ -3,6 +3,7 @@ and each planted defect fails the checks it should and no others."""
 
 from __future__ import annotations
 
+import re
 import tempfile
 import threading
 import unittest
@@ -12,19 +13,25 @@ import check_bookclub
 import model_club
 
 PATIENCE_SECONDS = 0.5
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# the ways a page states how many desks there are
+DESK_COUNT_STATED = (r"\b(\d+) desks\b", r"desks: \d+ of (\d+)", r"\d+ of (\d+) desks")
 
 COMMANDS = {1, 4, 7, 10, 13, 16, 18, 20, 22}
 PROJECTIONS = {2, 5, 8, 11, 14, 19, 21, 23}
 QUERIES = {3, 6, 9, 12, 15}
 POLICY = 17
+OBSERVER = {24, 25, 26, 27}
 REBUILD = "rebuild"
 
 # defect -> the desks (and the rebuild) that must fail, and no others
 FAILED_BY_DEFECT = {
     # no row for a new club: its projection, its query, the two commands that
-    # take the club's name from the row, and the open club of the trace
-    "clubs_row_never_written": {2, 3, 4, 7, REBUILD},
-    "club_name_not_stamped": {4, 7},
+    # take the club's name from the row, the open club of the trace, and the
+    # observer's desks, which all start from a club readers can see
+    "clubs_row_never_written": {2, 3, 4, 7, REBUILD} | OBSERVER,
+    # the fact carries no club name either, so the scoreboard cannot show it
+    "club_name_not_stamped": {4, 7, 24},
     "miss_answers_200": {3, 6, 9, 12},
     "readings_out_of_order": {15},
     # the finished event carries the wrong start, and so does the row made from it
@@ -34,6 +41,10 @@ FAILED_BY_DEFECT = {
     "replay_forgets_the_end": {REBUILD},
     "policy_runs_on_replay": {REBUILD},
     "log_not_kept": {REBUILD},
+    "no_facts_published": OBSERVER,
+    "observer_ignores_retirement": {26},
+    "observer_forgets_the_club_name": {24},
+    "observer_never_verifies": {27},
     "never_says:already_initiated": {1, REBUILD},
     "never_says:already_registered": {4, REBUILD},
     "never_says:already_procured": {7},
@@ -51,23 +62,44 @@ class RunningModel:
     def __init__(self, log_path: Path, defects: frozenset[str]) -> None:
         self.log_path = log_path
         self.defects = defects
-        self.server = model_club.serve(model_club.ModelClub(log_path, defects), 0)
+        self.model = model_club.ModelClub(log_path, defects)
+        self.server = model_club.serve(self.model, 0)
         self.port = self.server.server_address[1]
+        self.url = f"http://127.0.0.1:{self.port}"
+        self.observer = model_club.ModelObserver(self.url, defects)
+        self.observer_server = model_club.serve_observer(self.observer, 0)
+        self.observer_url = f"http://127.0.0.1:{self.observer_server.server_address[1]}"
+        self.observer_thread = threading.Thread(
+            target=self.observer_server.serve_forever, daemon=True
+        )
+        self.observer_thread.start()
         self._start()
 
     def _start(self) -> None:
+        self.model.subscribers.append(self.observer.receive)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
-    def stop(self) -> None:
+    def _stop_club(self) -> None:
         self.server.shutdown()
         self.server.server_close()
         self.thread.join()
 
+    def stop(self) -> None:
+        self._stop_club()
+        self.observer_server.shutdown()
+        self.observer_server.server_close()
+        self.observer_thread.join()
+
     def restart(self) -> None:
-        self.stop()
-        self.server = model_club.serve(model_club.ModelClub(self.log_path, self.defects), self.port)
+        """Only the club restarts; the observer keeps running, as a separate service does."""
+        self._stop_club()
+        self.model = model_club.ModelClub(self.log_path, self.defects)
+        self.server = model_club.serve(self.model, self.port)
         self._start()
+
+    def club(self) -> check_bookclub.Club:
+        return check_bookclub.Club(self.url, PATIENCE_SECONDS, self.observer_url)
 
 
 def failed_checks(defects: frozenset[str]) -> set[int | str]:
@@ -75,7 +107,7 @@ def failed_checks(defects: frozenset[str]) -> set[int | str]:
     with tempfile.TemporaryDirectory() as scratch:
         running = RunningModel(Path(scratch) / "club.log", defects)
         try:
-            club = check_bookclub.Club(f"http://127.0.0.1:{running.port}", PATIENCE_SECONDS)
+            club = running.club()
             witness = check_bookclub.check_desks(club)
             running.restart()
             witness = check_bookclub.check_rebuild(club, witness)
@@ -91,11 +123,24 @@ class TheDesks(unittest.TestCase):
     def test_every_desk_is_checked_once_and_each_kind_is_counted(self) -> None:
         names = [desk.__name__ for desk in check_bookclub.DESKS]
         self.assertEqual(len(set(names)), check_bookclub.DESK_COUNT)
-        every_desk = COMMANDS | PROJECTIONS | QUERIES | {POLICY}
+        every_desk = COMMANDS | PROJECTIONS | QUERIES | {POLICY} | OBSERVER
         self.assertEqual(every_desk, set(range(1, check_bookclub.DESK_COUNT + 1)))
 
     def test_every_defect_the_model_offers_has_an_expectation(self) -> None:
         self.assertLessEqual(set(model_club.DEFECTS), set(FAILED_BY_DEFECT))
+
+
+class ThePages(unittest.TestCase):
+    def test_every_page_that_counts_the_desks_counts_what_the_suite_checks(self) -> None:
+        pages = [*REPO_ROOT.glob("*.md"), *REPO_ROOT.glob("assignment/*.md")]
+        stated = {
+            (page.name, int(count))
+            for page in pages
+            for pattern in DESK_COUNT_STATED
+            for count in re.findall(pattern, page.read_text(encoding="utf-8"))
+        }
+        self.assertIn(("README.md", check_bookclub.DESK_COUNT), stated)
+        self.assertEqual({count for _, count in stated}, {check_bookclub.DESK_COUNT}, stated)
 
 
 class ASoundClub(unittest.TestCase):
@@ -106,7 +151,7 @@ class ASoundClub(unittest.TestCase):
         with tempfile.TemporaryDirectory() as scratch:
             running = RunningModel(Path(scratch) / "club.log", frozenset())
             try:
-                club = check_bookclub.Club(f"http://127.0.0.1:{running.port}", PATIENCE_SECONDS)
+                club = running.club()
                 witness = check_bookclub.check_desks(club)
             finally:
                 running.stop()
@@ -118,7 +163,7 @@ class ASoundClub(unittest.TestCase):
         with tempfile.TemporaryDirectory() as scratch:
             running = RunningModel(Path(scratch) / "club.log", frozenset())
             try:
-                club = check_bookclub.Club(f"http://127.0.0.1:{running.port}", PATIENCE_SECONDS)
+                club = running.club()
                 witness = check_bookclub.check_desks(club)
                 for _ in range(2):
                     running.restart()
@@ -131,7 +176,7 @@ class ASoundClub(unittest.TestCase):
         with tempfile.TemporaryDirectory() as scratch:
             running = RunningModel(Path(scratch) / "club.log", frozenset())
             try:
-                club = check_bookclub.Club(f"http://127.0.0.1:{running.port}", PATIENCE_SECONDS)
+                club = running.club()
                 witness = check_bookclub.check_desks(club)
             finally:
                 running.stop()
@@ -151,7 +196,8 @@ class ABrokenClub(unittest.TestCase):
 
 class NoClubAtAll(unittest.TestCase):
     def test_every_check_fails(self) -> None:
-        club = check_bookclub.Club("http://127.0.0.1:9", PATIENCE_SECONDS)
+        nowhere = "http://127.0.0.1:9"
+        club = check_bookclub.Club(nowhere, PATIENCE_SECONDS, nowhere)
         witness = check_bookclub.check_desks(club)
         self.assertEqual(check_bookclub.desks_passed(witness), 0)
         self.assertFalse(check_bookclub.rebuilds(witness))

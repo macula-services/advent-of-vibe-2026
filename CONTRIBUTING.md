@@ -2,11 +2,12 @@
 
 ## Adding your row
 
-1. Build the club in your own public repository, following [RULES.md](RULES.md).
+1. Build the club and its observer in your own public repository, following [RULES.md](RULES.md). Start them.
 2. From a checkout of this repository, check it:
 
    ```sh
-   python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488 --witness witness.json
+   python3 check_bookclub/check_bookclub.py run --base-url http://127.0.0.1:8488 \
+       --observer-url http://127.0.0.1:8489 --witness witness.json
    # stop your club, delete its read model, start it again
    python3 check_bookclub/check_bookclub.py recheck --base-url http://127.0.0.1:8488 --witness witness.json
    python3 stranger_test/stranger_test.py path/to/your/checkout
@@ -27,7 +28,7 @@ Clone the repository the row names, check out the commit, start the club, run th
 
 ## Changing the assignment or the tools
 
-The assignment and the suite are frozen from version 1.0.0 on. Before that, and for mistakes after that, open an issue first. A change to a check needs a matching planted defect in `check_bookclub/model_club.py` and an expectation in `check_bookclub/test_check_bookclub.py`, so that the suite is shown to fail a club that gets it wrong.
+The suite carries a version, and every row shows the version it was checked with. To change the assignment or a check, open an issue first. A change to a check needs a matching planted defect in `check_bookclub/model_club.py` and an expectation in `check_bookclub/test_check_bookclub.py`, so that the suite is shown to fail a club that gets it wrong.
 
 Run everything CI runs before you push:
 

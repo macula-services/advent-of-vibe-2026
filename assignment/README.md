@@ -2,7 +2,7 @@
 
 *This exists so everyone builds the same system, from the same picture.*
 
-A book club has members and books. Members read books. Now and then the club throws a party. One day the club closes.
+A book club has members and books. Members read books. Now and then the club throws a party. One day the club closes. Someone outside keeps a scoreboard of all the clubs.
 
 That is the whole business. This page gives it to you three ways: as a wall of sticky notes, as a table, and as the tree of folders the notes turn into. [CHECKS.md](CHECKS.md) says what is checked, desk by desk, and [CONTRACT.md](CONTRACT.md) gives the HTTP routes and the JSON, field by field.
 
@@ -19,7 +19,7 @@ How to read it:
 - A **lilac** note on a command's left edge is a policy: the club reacting to one of its own events. *When a member has registered, maybe plan a party.*
 - A **green** note is a read model: a table kept up to date from the events, so that questions are cheap to answer.
 - The **lanes** say who asks: the organiser or a member.
-- The wide **pink** notes are facts the club tells the outside world. They belong to the [optional mesh track](MESH.md).
+- The wide **pink** notes are facts the club tells the outside world. The observer lives on them.
 
 ## The wall as a table
 
@@ -54,6 +54,20 @@ We call such a stream a dossier: a folder that passes from desk to desk, each de
 
 The policy is the only place where one dossier touches another: a member's event makes the club plan a party. It does so by sending the club a command, never by writing into the club's stream.
 
+## The observer
+
+The club tells the outside world three things: a member registered, a book was procured, a book was retired. Each is a **fact**: a message with a fixed public shape, separate from the club's own events.
+
+The observer is a second service. It never looks inside the club. It takes in the three facts, keeps a read model of its own, and answers one question: `get_scoreboard`, a list of the clubs it has heard of with their members and books.
+
+| Fact (pink) | The observer's desk | What the scoreboard shows |
+|---|---|---|
+| `member_registered` | `ingest_member_registered` | the club, its name, its members, who registered last |
+| `book_procured` | `ingest_book_procured` | the books on the club's shelf |
+| `book_retired` | `ingest_book_retired` | the books the club retired |
+
+How a fact gets from the club to the observer is yours to choose. The reference uses the [Macula mesh](MESH.md).
+
 ## The tree
 
 A note on the wall becomes a folder in the code, named after the note. This is the Erlang club's tree. Yours will be spelled the way your language spells things, but a stranger should be able to match it to the wall without opening a file.
@@ -63,12 +77,17 @@ host_bookclub/                 what the club can do: one folder per command
     initiate_bookclub/  register_member/  procure_book/  start_reading/  finish_reading/
     plan_party/  unregister_member/  retire_book/  archive_bookclub/
     on_member_registered_v1_maybe_plan_party/          the policy
+    emit_member_registered_v1_to_mesh/  emit_book_procured_v1_to_mesh/
+    emit_book_retired_v1_to_mesh/                      the three facts, leaving the club
 project_bookclub/              what the club writes down for readers: one folder per event
     bookclub_initiated/  bookclub_archived/  member_registered/  member_unregistered/
     book_procured/  book_retired/  reading_started/  reading_finished/
 query_bookclub/                what the club can be asked: one folder per question
     get_bookclub_by_id/  get_member_by_id/  get_book_by_id/  get_reading_by_id/
     get_readings_by_member/
+bookclub_observer/             the second service: one folder per fact it takes in
+    ingest_member_registered/  ingest_book_procured/  ingest_book_retired/
+    get_scoreboard/                                    its one question
 ```
 
 Inside a command's folder live the command, its event, the rule that decides, and the door the outside world knocks on. Nothing about registering a member lives anywhere else.
@@ -79,4 +98,4 @@ The three top-level names are the three departments of a CQRS system: the one th
 
 ## Where the method comes from
 
-The wall, the lanes and the rule that a note becomes a folder are described in [mcl-corpus](https://github.com/macula-services/mcl-corpus): [event storming, from the wall to the tree](https://github.com/macula-services/mcl-corpus/blob/main/philosophy/EVENT_STORMING.md) and [the D5 model](https://github.com/macula-services/mcl-corpus/blob/main/philosophy/D5_MODEL.md). You do not have to read them to take part. Your agent may, if your entry lists them as an add-on.
+The wall, the lanes and the rule that a note becomes a folder are described in [mcl-corpus](https://github.com/macula-services/mcl-corpus): [event storming, from the wall to the tree](https://github.com/macula-services/mcl-corpus/blob/main/philosophy/EVENT_STORMING.md) and [the D5 model](https://github.com/macula-services/mcl-corpus/blob/main/philosophy/D5_MODEL.md). You do not have to read them to take part. If your agent reads them, list them as an add-on.
