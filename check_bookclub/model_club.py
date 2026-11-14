@@ -6,10 +6,11 @@ started with a named defect, and the suite's own tests assert which check
 fails. It is NOT an entry and not an example to copy: one file holding every
 desk is exactly what the assignment forbids.
 
-    model_club.py --port 8488 --log club.log [--defect no_party_policy]
+    model_club.py --port 8488 --observer-port 8489 --log club.log [--defect no_party_policy]
 
 The log file is the event log. The read model lives in memory, so every
-restart rebuilds it from the log.
+restart rebuilds it from the log. The model observer runs in the same process
+on its own port; it is handed the club's facts and nothing else.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import argparse
 import json
 import threading
 import time
+import urllib.request
 import uuid
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -41,6 +43,23 @@ LIVES = {
 }
 ENDINGS = frozenset(life[0] for life in LIVES.values())
 
+# What the club tells the outside world: the event, and the fields of the fact.
+FACTS = {
+    "member_registered_v1": ("member_id", "club_id", "club_name", "name", "registered_at"),
+    "book_procured_v1": ("book_id", "club_id", "club_name", "title", "author", "procured_at"),
+    "book_retired_v1": (
+        "book_id",
+        "club_id",
+        "club_name",
+        "title",
+        "author",
+        "procured_at",
+        "retired_by",
+        "retired_at",
+    ),
+}
+VERIFY_TIMEOUT_SECONDS = 5.0
+
 DEFECTS = (
     "clubs_row_never_written",
     "club_name_not_stamped",
@@ -52,6 +71,10 @@ DEFECTS = (
     "replay_forgets_the_end",
     "policy_runs_on_replay",
     "log_not_kept",
+    "no_facts_published",
+    "observer_ignores_retirement",
+    "observer_forgets_the_club_name",
+    "observer_never_verifies",
 )
 NEVER_SAYS = "never_says:"
 
@@ -93,6 +116,7 @@ class ModelClub:
             "readings": {},
         }
         self.registrations = 0
+        self.subscribers: list[Callable[[str, dict[str, Any]], None]] = []
         self.lock = threading.Lock()
         self._replay()
 
@@ -117,8 +141,17 @@ class ModelClub:
             with self.log_path.open("a", encoding="utf-8") as log:
                 log.write(json.dumps({"stream": stream_id, "event": event}) + "\n")
         self._project(event, replaying=False)
+        self._publish(event)
         self._react(event)
         return version
+
+    def _publish(self, event: dict[str, Any]) -> None:
+        """Tell the subscribers a fact. Only for a new event, never on replay."""
+        fields = FACTS.get(event["event_type"])
+        if fields is None or self.has("no_facts_published"):
+            return
+        for subscriber in self.subscribers:
+            subscriber(event["event_type"], echo(event, *fields))
 
     def dossier(self, kind: str, stream_id: str, *, opening: bool = False) -> list[dict[str, Any]]:
         """The stream, if this command may add to it; a refusal otherwise."""
@@ -164,6 +197,78 @@ class ModelClub:
         rows = [row for row in self.tables["readings"].values() if row["member_id"] == member_id]
         latest_first = self.has("readings_out_of_order")
         return sorted(rows, key=lambda row: row["started_at"], reverse=latest_first)
+
+
+class ModelObserver:
+    """The second service: it keeps its own read model from the club's facts."""
+
+    def __init__(self, club_url: str, defects: frozenset[str] = frozenset()) -> None:
+        self.club_url = club_url
+        self.defects = defects
+        self.members: dict[str, dict[str, Any]] = {}
+        self.books: dict[str, dict[str, Any]] = {}
+        self.lock = threading.Lock()
+
+    def has(self, defect: str) -> bool:
+        return defect in self.defects
+
+    def receive(self, kind: str, fact: dict[str, Any]) -> None:
+        with self.lock:
+            if kind == "member_registered_v1":
+                self.members[fact["member_id"]] = fact
+            elif kind == "book_procured_v1":
+                self._shelve(fact)
+            elif kind == "book_retired_v1" and not self.has("observer_ignores_retirement"):
+                self.books[fact["book_id"]] = {**fact, "status": "retired"}
+
+    def _shelve(self, fact: dict[str, Any]) -> None:
+        """A book that is already retired stays retired, whatever arrives later."""
+        if self.books.get(fact["book_id"], {}).get("status") != "retired":
+            self.books[fact["book_id"]] = {**fact, "status": "on_shelf"}
+
+    def scoreboard(self) -> dict[str, Any]:
+        with self.lock:
+            members, books = list(self.members.values()), list(self.books.values())
+        club_ids = sorted({member["club_id"] for member in members})
+        return {
+            "members": len(members),
+            "books_on_shelf": _count(books, "on_shelf"),
+            "books_retired": _count(books, "retired"),
+            "clubs": [self._club(club_id, members, books) for club_id in club_ids],
+        }
+
+    def _club(self, club_id: str, members: list[dict], books: list[dict]) -> dict[str, Any]:
+        own = sorted(
+            (member for member in members if member["club_id"] == club_id),
+            key=lambda member: member["registered_at"],
+        )
+        latest = own[-1]
+        own_books = [book for book in books if book["club_id"] == club_id]
+        forgets_name = self.has("observer_forgets_the_club_name")
+        return {
+            "club_id": club_id,
+            "club_name": "" if forgets_name else latest["club_name"],
+            "members": len(own),
+            "last_registered": echo(latest, "name", "registered_at"),
+            "books_on_shelf": _count(own_books, "on_shelf"),
+            "books_retired": _count(own_books, "retired"),
+            "bookclub_verified": self._verified(club_id),
+        }
+
+    def _verified(self, club_id: str) -> str:
+        """Ask the club itself whether it knows this club."""
+        if self.has("observer_never_verifies"):
+            return "unknown"
+        try:
+            url = f"{self.club_url}/api/clubs/{club_id}"
+            with urllib.request.urlopen(url, timeout=VERIFY_TIMEOUT_SECONDS):
+                return "yes"
+        except OSError:
+            return "no"
+
+
+def _count(books: list[dict[str, Any]], status: str) -> int:
+    return sum(1 for book in books if book["status"] == status)
 
 
 # ---------------------------------------------------------------------------
@@ -431,9 +536,30 @@ def serve(model: ModelClub, port: int) -> ThreadingHTTPServer:
     return ThreadingHTTPServer(("127.0.0.1", port), _handler(model))
 
 
+def serve_observer(observer: ModelObserver, port: int) -> ThreadingHTTPServer:
+    """A server for the model observer, bound and ready; the caller runs serve_forever."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            known = self.path == "/api/scoreboard"
+            status, body = (200, observer.scoreboard()) if known else (404, UNKNOWN_ROUTE)
+            data = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *_: Any) -> None:
+            pass
+
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--port", type=int, default=8488)
+    parser.add_argument("--observer-port", type=int, default=8489)
     parser.add_argument("--log", type=Path, required=True, help="the event log file")
     parser.add_argument(
         "--defect",
@@ -442,8 +568,16 @@ def main() -> None:
         help=f"one of {', '.join(DEFECTS)}, or {NEVER_SAYS}<refusal word>; repeatable",
     )
     arguments = parser.parse_args()
-    server = serve(ModelClub(arguments.log, frozenset(arguments.defect)), arguments.port)
-    print(f"model club on http://127.0.0.1:{server.server_address[1]}, log in {arguments.log}")
+    defects = frozenset(arguments.defect)
+    model = ModelClub(arguments.log, defects)
+    server = serve(model, arguments.port)
+    club_url = f"http://127.0.0.1:{server.server_address[1]}"
+    observer = ModelObserver(club_url, defects)
+    model.subscribers.append(observer.receive)
+    observer_server = serve_observer(observer, arguments.observer_port)
+    threading.Thread(target=observer_server.serve_forever, daemon=True).start()
+    print(f"model club on {club_url}, log in {arguments.log}")
+    print(f"model observer on http://127.0.0.1:{observer_server.server_address[1]}")
     server.serve_forever()
 
 
