@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
-"""Draw the table: read every entry in entries/ and write TABLE.md.
+"""Draw the datasheet and the table: read every entry in entries/, write DATASHEET.csv and TABLE.md.
 
-This exists so the public table is exactly what the entry files say, and a
-pull request whose table and entries disagree fails by name.
+This exists so the public data is exactly what the entry files say: one row
+per run, one column per choice that was made, in a file anyone can load and
+analyse. A pull request whose data and entries disagree fails by name.
 
-    draw_table.py            write TABLE.md
-    draw_table.py --check    fail if an entry is ill-formed or TABLE.md is stale
+    draw_table.py            write DATASHEET.csv and TABLE.md
+    draw_table.py --check    fail if an entry is ill-formed or a drawn file is stale
 
-Python standard library only. The number of desks is the suite's own.
+A new dimension is one more line in COLUMNS. Python standard library only.
+The number of desks is the suite's own.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime
 import importlib.util
+import io
 import re
 import sys
 import tomllib
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENTRIES = REPO_ROOT / "entries"
 TABLE = REPO_ROOT / "TABLE.md"
+DATASHEET = REPO_ROOT / "DATASHEET.csv"
 TEMPLATE = "TEMPLATE.toml"
 SUITE = REPO_ROOT / "check_bookclub" / "check_bookclub.py"
 SUITE_MODULE = "the_check_suite"
 COST_BASES = ("billed", "list-price", "local")
+RUNS_ON = ("hosted", "local", "both")
 STRANGER_RESULTS = ("pass", "fail")
 NOT_RECORDED = "not recorded"
 NOT_RUN = "not run"
+YES, NO = "yes", "no"
+LIST_SEPARATOR = "; "
 
 Entry = dict[str, Any]
 
@@ -67,48 +77,85 @@ def _flag(value: Any) -> bool:
     return isinstance(value, bool)
 
 
-# section, field -> (what it must be, the check). Every entry needs these.
-ALWAYS = {
-    ("", "handle"): ("a name", _text),
-    ("", "repo"): (
-        "an https URL",
-        lambda v: _text(v) and re.fullmatch(r"https://\S+", v) is not None,
+def _one_of(choices: tuple[str, ...]) -> Callable[[Any], bool]:
+    return lambda value: value in choices
+
+
+def _matches(pattern: str) -> Callable[[Any], bool]:
+    return lambda value: _text(value) and re.fullmatch(pattern, value) is not None
+
+
+# Who must fill a column in.
+ALWAYS = "always"  # every entry
+UNDER_THE_RULES = "under the rules"  # every entry but the three reference clubs, which predate them
+IF_IT_APPLIES = "if it applies"  # nobody has to
+
+
+@dataclass(frozen=True)
+class Column:
+    """One column of the datasheet: where an entry file holds it and what it must be."""
+
+    section: str
+    name: str
+    must_be: str
+    holds: Callable[[Any], bool]
+    needed: str = ALWAYS
+
+
+# The datasheet, left to right. A new dimension is one more line here.
+COLUMNS = (
+    Column("build", "language", "a language", _text),
+    Column("build", "frameworks", "the frameworks and libraries, in a few words", _text),
+    Column("services", "event_store", "what keeps the event log", _text),
+    Column("services", "read_model_store", "what keeps the read models", _text),
+    Column("services", "fact_carrier", "what carries the three facts to the observer", _text),
+    Column("services", "other_services", "a list, [] for none", _texts),
+    Column("build", "harness", "the harness", _text),
+    Column("build", "models", "a list with at least one model", lambda v: _texts(v) and len(v) > 0),
+    Column("build", "provider", "who served the models", _text, UNDER_THE_RULES),
+    Column("build", "addons", "a list, [] for none", _texts, UNDER_THE_RULES),
+    Column("environment", "runs_on", f"one of {', '.join(RUNS_ON)}", _one_of(RUNS_ON)),
+    Column("environment", "hardware", "the machine the work ran on", _text, UNDER_THE_RULES),
+    Column("cost", "usd", "an amount of 0 or more", _amount),
+    Column("cost", "approximate", "true or false", _flag, IF_IT_APPLIES),
+    Column("cost", "basis", f"one of {', '.join(COST_BASES)}", _one_of(COST_BASES)),
+    Column("cost", "tokens", "a count of 0 or more", _count, UNDER_THE_RULES),
+    Column("cost", "agent_minutes", "a count of 0 or more", _count, UNDER_THE_RULES),
+    Column("cost", "human_turns", "a count of 0 or more", _count, UNDER_THE_RULES),
+    Column("cost", "hand_written_lines", "a count of 0 or more", _count, UNDER_THE_RULES),
+    Column(
+        "cost", "attempts", "a count of 1 or more", lambda v: _count(v) and v >= 1, UNDER_THE_RULES
     ),
-    ("", "commit"): (
-        "a full 40-character commit id",
-        lambda v: _text(v) and re.fullmatch(r"[0-9a-f]{40}", v) is not None,
-    ),
-    ("", "entered"): ("a date", lambda v: isinstance(v, datetime.date)),
-    ("", "licence"): ("a licence name, or none", _text),
-    ("build", "language"): ("a language", _text),
-    ("build", "stack"): ("the stack, in a few words", _text),
-    ("build", "harness"): ("the harness", _text),
-    ("build", "models"): ("a list with at least one model", lambda v: _texts(v) and len(v) > 0),
-    ("cost", "usd"): ("an amount of 0 or more", _amount),
-    ("cost", "basis"): (f"one of {', '.join(COST_BASES)}", lambda v: v in COST_BASES),
-    ("result", "stranger"): (
-        f"one of {', '.join(STRANGER_RESULTS)}",
-        lambda v: v in STRANGER_RESULTS,
-    ),
-    ("result", "mesh"): ("true or false", _flag),
-}
-# An entry under the rules needs these too; the three reference clubs predate them.
-UNDER_THE_RULES = {
-    ("", "run_with"): ("the one command that starts the club and its observer", _text),
-    ("build", "addons"): ("a list, [] for none", _texts),
-    ("cost", "tokens"): ("a count of 0 or more", _count),
-    ("cost", "agent_minutes"): ("a count of 0 or more", _count),
-    ("cost", "human_turns"): ("a count of 0 or more", _count),
-    ("cost", "hand_written_lines"): ("a count of 0 or more", _count),
-    ("cost", "attempts"): ("a count of 1 or more", lambda v: _count(v) and v >= 1),
-    ("result", "desks"): (
+    Column(
+        "result",
+        "desks",
         f"a count from 0 to {DESK_COUNT}",
         lambda v: _count(v) and v <= DESK_COUNT,
+        UNDER_THE_RULES,
     ),
-    ("result", "rebuilds"): ("true or false", _flag),
-    ("result", "suite"): ("the suite version", _text),
-    ("result", "evidence"): ("the evidence folder in the repo", _text),
-}
+    Column("result", "rebuilds", "true or false", _flag, UNDER_THE_RULES),
+    Column(
+        "result", "stranger", f"one of {', '.join(STRANGER_RESULTS)}", _one_of(STRANGER_RESULTS)
+    ),
+    Column("result", "suite", "the suite version", _text, UNDER_THE_RULES),
+    Column(
+        "",
+        "run_with",
+        "the one command that starts the club and its observer",
+        _text,
+        UNDER_THE_RULES,
+    ),
+    Column("", "handle", "a name", _text),
+    Column("", "repo", "an https URL", _matches(r"https://\S+")),
+    Column("", "commit", "a full 40-character commit id", _matches(r"[0-9a-f]{40}")),
+    Column("", "entered", "a date", lambda v: isinstance(v, datetime.date)),
+    Column("", "licence", "a licence name, or none", _text),
+    Column("result", "evidence", "the evidence folder in the repo", _text, UNDER_THE_RULES),
+    Column("", "reference", "true or false", _flag, IF_IT_APPLIES),
+    Column("result", "notes", "a few words", lambda v: isinstance(v, str), IF_IT_APPLIES),
+)
+# Worked out from an entry, not written in it.
+COMPLETE = "complete"
 
 
 def field(entry: Entry, section: str, name: str) -> Any:
@@ -116,18 +163,26 @@ def field(entry: Entry, section: str, name: str) -> Any:
     return holder.get(name) if isinstance(holder, dict) else None
 
 
+def is_reference(entry: Entry) -> bool:
+    return entry.get("reference") is True
+
+
+def may_be_left_out(entry: Entry, column: Column) -> bool:
+    return column.needed == IF_IT_APPLIES or (
+        column.needed == UNDER_THE_RULES and is_reference(entry)
+    )
+
+
 def problems(entry: Entry) -> list[str]:
     """What is wrong with one entry; empty when it can be drawn."""
-    is_reference = entry.get("reference") is True
     found = []
-    for (section, name), (must_be, holds) in (ALWAYS | UNDER_THE_RULES).items():
-        value = field(entry, section, name)
-        optional = is_reference and (section, name) in UNDER_THE_RULES
-        if value is None and optional:
+    for column in COLUMNS:
+        value = field(entry, column.section, column.name)
+        if value is None and may_be_left_out(entry, column):
             continue
-        if value is None or not holds(value):
-            where = f"[{section}] {name}" if section else name
-            found.append(f"{where} must be {must_be}")
+        if value is None or not column.holds(value):
+            where = f"[{column.section}] {column.name}" if column.section else column.name
+            found.append(f"{where} must be {column.must_be}")
     return found
 
 
@@ -146,8 +201,57 @@ def read_entries(folder: Path) -> tuple[list[Entry], list[str]]:
     return entries, found
 
 
+def is_complete(entry: Entry) -> bool:
+    every_desk = field(entry, "result", "desks") == DESK_COUNT
+    rebuilt = field(entry, "result", "rebuilds") is True
+    return every_desk and rebuilt and field(entry, "result", "stranger") == "pass"
+
+
+def ranked(entries: list[Entry]) -> list[Entry]:
+    """Complete runs first, cheapest on top; then the rest, most desks first."""
+
+    def place(entry: Entry) -> tuple[int, float, float, str]:
+        passed = field(entry, "result", "desks") or 0
+        usd = entry["cost"]["usd"]
+        return (0, usd, 0, entry["handle"]) if is_complete(entry) else (1, -passed, usd, "")
+
+    return sorted(entries, key=place)
+
+
+def in_order(entries: list[Entry]) -> list[Entry]:
+    """The order of both drawn files: the runs under the rules, ranked, then the references."""
+    references = sorted(filter(is_reference, entries), key=lambda entry: entry["cost"]["usd"])
+    return ranked([entry for entry in entries if not is_reference(entry)]) + references
+
+
 # ---------------------------------------------------------------------------
-# Drawing
+# The datasheet: every column, as data
+# ---------------------------------------------------------------------------
+
+
+def datum(value: Any) -> str:
+    """One datasheet cell: plain, so a spreadsheet reads it as what it is."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return YES if value else NO
+    if isinstance(value, list):
+        return LIST_SEPARATOR.join(value)
+    return str(value)
+
+
+def datasheet(entries: list[Entry]) -> str:
+    drawn = io.StringIO()
+    sheet = csv.writer(drawn, lineterminator="\n")
+    sheet.writerow([*(column.name for column in COLUMNS), COMPLETE])
+    for entry in in_order(entries):
+        cells = [datum(field(entry, column.section, column.name)) for column in COLUMNS]
+        sheet.writerow([*cells, datum(is_complete(entry))])
+    return drawn.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# The table: the columns a reader compares first
 # ---------------------------------------------------------------------------
 
 
@@ -156,7 +260,7 @@ def cell(value: Any) -> str:
     if value is None or value == [] or value == "":
         return NOT_RECORDED
     if isinstance(value, bool):
-        return "yes" if value else "no"
+        return YES if value else NO
     if isinstance(value, list):
         value = ", ".join(value)
     if isinstance(value, int):
@@ -184,26 +288,26 @@ def rebuilds(entry: Entry) -> str:
     return NOT_RUN if rebuilt is None else cell(rebuilt)
 
 
-def addons(entry: Entry) -> str:
-    listed = field(entry, "build", "addons")
-    return "none" if listed == [] else cell(listed)
+def shown(section: str, name: str) -> Callable[[Entry], str]:
+    return lambda entry: cell(field(entry, section, name))
 
 
-def is_complete(entry: Entry) -> bool:
-    every_desk = field(entry, "result", "desks") == DESK_COUNT
-    rebuilt = field(entry, "result", "rebuilds") is True
-    return every_desk and rebuilt and field(entry, "result", "stranger") == "pass"
-
-
-def ranked(entries: list[Entry]) -> list[Entry]:
-    """Complete entries first, cheapest on top; then the rest, most desks first."""
-
-    def place(entry: Entry) -> tuple[int, float, float, str]:
-        passed = field(entry, "result", "desks") or 0
-        usd = entry["cost"]["usd"]
-        return (0, usd, 0, entry["handle"]) if is_complete(entry) else (1, -passed, usd, "")
-
-    return sorted(entries, key=place)
+# title -> what the cell shows
+TABLE_COLUMNS: dict[str, Callable[[Entry], str]] = {
+    "Language": shown("build", "language"),
+    "Frameworks": shown("build", "frameworks"),
+    "Event store": shown("services", "event_store"),
+    "Read models": shown("services", "read_model_store"),
+    "Facts travel by": shown("services", "fact_carrier"),
+    "Harness": shown("build", "harness"),
+    "Models": shown("build", "models"),
+    "Runs on": shown("environment", "runs_on"),
+    "Cost": cost,
+    "Tokens": shown("cost", "tokens"),
+    "Desks": desks,
+    "Rebuilds": rebuilds,
+    "Repository": who,
+}
 
 
 def rows(header: list[str], lines: list[list[str]]) -> list[str]:
@@ -212,123 +316,53 @@ def rows(header: list[str], lines: list[list[str]]) -> list[str]:
 
 
 def main_table(entries: list[Entry]) -> list[str]:
-    header = [
-        "#",
-        "Who",
-        "Language",
-        "Stack",
-        "Harness",
-        "Models",
-        "Add-ons",
-        "Cost",
-        "Desks",
-        "Rebuilds",
-    ]
     lines = [
         [
             str(place) if is_complete(entry) else "",
-            who(entry),
-            cell(entry["build"]["language"]),
-            cell(entry["build"]["stack"]),
-            cell(entry["build"]["harness"]),
-            cell(entry["build"]["models"]),
-            addons(entry),
-            cost(entry),
-            desks(entry),
-            rebuilds(entry),
+            *(show(entry) for show in TABLE_COLUMNS.values()),
         ]
         for place, entry in enumerate(entries, start=1)
     ]
-    return rows(header, lines)
+    return rows(["#", *TABLE_COLUMNS], lines)
 
 
-def fine_print(entries: list[Entry]) -> list[str]:
-    header = [
-        "Who",
-        "Cost basis",
-        "Tokens",
-        "Agent minutes",
-        "Human turns",
-        "Hand-written lines",
-        "Attempts",
-        "Suite",
-        "Runs with",
-        "Stranger test",
-        "Mesh",
-        "Licence",
-        "Commit",
-        "Entered",
-        "Notes",
-    ]
-    lines = [
-        [
-            who(entry),
-            cell(entry["cost"]["basis"]),
-            *(
-                cell(field(entry, "cost", name))
-                for name in (
-                    "tokens",
-                    "agent_minutes",
-                    "human_turns",
-                    "hand_written_lines",
-                    "attempts",
-                )
-            ),
-            cell(field(entry, "result", "suite")),
-            cell(field(entry, "", "run_with")),
-            cell(entry["result"]["stranger"]),
-            cell(entry["result"]["mesh"]),
-            cell(entry["licence"]),
-            f"[`{entry['commit'][:7]}`]({entry['repo'].rstrip('/')}/tree/{entry['commit']})",
-            cell(entry["entered"]),
-            cell(field(entry, "result", "notes")) if field(entry, "result", "notes") else "",
-        ]
-        for entry in entries
-    ]
-    return rows(header, lines)
-
-
-def draw(entries: list[Entry]) -> str:
-    under_the_rules = ranked([entry for entry in entries if entry.get("reference") is not True])
-    references = sorted(
-        (entry for entry in entries if entry.get("reference") is True),
-        key=lambda entry: entry["cost"]["usd"],
-    )
+def table(entries: list[Entry]) -> str:
+    under_the_rules = ranked([entry for entry in entries if not is_reference(entry)])
+    references = [entry for entry in in_order(entries) if is_reference(entry)]
     page = [
         "# The table",
         "",
         "<!-- Drawn by draw_table/draw_table.py from entries/. Do not edit by hand. -->",
         "",
-        "Every row is one book club and its observer, built by an AI agent, "
-        "in a public repository. "
-        f"A row is complete when all {DESK_COUNT} desks pass, the club rebuilds its "
+        "Every row is one run: an AI agent building the book club and its observer with one "
+        "formula, the language, the services, the harness and the models of that row. "
+        f"A run is complete when all {DESK_COUNT} desks pass, the club rebuilds its "
         "read model from the log, and the stranger test passes; "
-        "complete rows are ranked by cost, cheapest first. "
-        "[RULES.md](RULES.md) says what each number means.",
+        "complete runs are ranked by cost, cheapest first.",
         "",
-        "## Entries",
+        "This page shows the columns a reader compares first. Every column of every run is "
+        f"in [{DATASHEET.name}]({DATASHEET.name}): load it into a spreadsheet and sort it "
+        "your own way. "
+        "[RULES.md](RULES.md) says what each column means.",
+        "",
+        "## Runs",
         "",
     ]
     if under_the_rules:
         page += main_table(under_the_rules)
-        page += ["", "### The fine print", "", *fine_print(under_the_rules)]
     else:
         page.append(
-            "No entries yet. The first row is yours: [CONTRIBUTING.md](CONTRIBUTING.md) says how."
+            "No runs yet. The first row is yours: [CONTRIBUTING.md](CONTRIBUTING.md) says how."
         )
     page += [
         "",
         "## The three that started it",
         "",
         "Three clubs were built before the rules existed. Their cost is what their author "
-        "remembers, and the numbers the rules ask for were never recorded. They are here as "
-        "the mark to beat, not as entries.",
+        "remembers, and most of what the rules ask for was never recorded. They are here as "
+        "the first three measurements, not as runs under the rules.",
         "",
         *main_table(references),
-        "",
-        "### The fine print",
-        "",
-        *fine_print(references),
         "",
     ]
     return "\n".join(page)
@@ -339,23 +373,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", help="change nothing; fail if stale")
     parser.add_argument("--entries", type=Path, default=ENTRIES)
     parser.add_argument("--table", type=Path, default=TABLE)
+    parser.add_argument("--datasheet", type=Path, default=DATASHEET)
     arguments = parser.parse_args(argv)
     entries, found = read_entries(arguments.entries)
     for problem in found:
         print(f"FAIL  {problem}", file=sys.stderr)
     if found:
         return 1
-    drawn = draw(entries)
+    drawn = {arguments.datasheet: datasheet(entries), arguments.table: table(entries)}
     if not arguments.check:
-        arguments.table.write_text(drawn, encoding="utf-8")
+        for path, text in drawn.items():
+            path.write_text(text, encoding="utf-8")
         return 0
-    on_disk = arguments.table.read_text(encoding="utf-8") if arguments.table.exists() else ""
-    if on_disk != drawn:
-        print(
-            f"FAIL  {arguments.table.name} is stale: run draw_table/draw_table.py", file=sys.stderr
-        )
-        return 1
-    return 0
+    stale = [
+        path
+        for path, text in drawn.items()
+        if not path.exists() or path.read_text(encoding="utf-8") != text
+    ]
+    for path in stale:
+        print(f"FAIL  {path.name} is stale: run draw_table/draw_table.py", file=sys.stderr)
+    return 1 if stale else 0
 
 
 if __name__ == "__main__":

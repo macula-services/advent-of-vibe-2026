@@ -96,7 +96,7 @@ In the new repository, in a folder named `vibe/`:
 - `witness.json`, written by the suite.
 - `FIRST_PROMPT.md`: the person's first message to you, word for word.
 - `INPUTS.md`: everything you were given or read to do the job: this repository, the reference club and observer, rules files, skills, MCP servers, templates.
-- `entry.toml`: a copy of [`entries/TEMPLATE.toml`](entries/TEMPLATE.toml), filled in. Fill in what you know for certain: the repository, the command that starts the solution (`run_with`), the language, the stack, the harness and the models if you know them, the desks, the rebuild result, the suite version (`check_bookclub.py --version`), the stranger test result. List this repository and the reference under `addons`.
+- `entry.toml`: a copy of [`entries/TEMPLATE.toml`](entries/TEMPLATE.toml), filled in. Fill in what you know for certain: the repository, the command that starts the solution (`run_with`), the language, the frameworks, every service under `[services]`, the harness and the models if you know them, the desks, the rebuild result, the suite version (`check_bookclub.py --version`), the stranger test result. List this repository and the reference under `addons`.
 - If your harness can show the tokens and the cost of this session, save its output as `vibe/cost.txt` and use those numbers.
 
 Never write a secret, a key or an account number into `vibe/`.
@@ -107,5 +107,5 @@ End with one short message that says:
 
 - the result: desks, rebuild, stranger test;
 - the stack you chose, how the facts travel, and the one command that starts everything;
-- which fields of `vibe/entry.toml` you could not fill and they must: usually `usd`, `basis`, `tokens`, `agent_minutes`, `human_turns`, `hand_written_lines`, `attempts`, and `commit` once they have pushed;
-- that the repository must be public, and that the row is added by a pull request to this repository with `vibe/entry.toml` copied to `entries/<handle>-<language>.toml` and the table redrawn (`python3 draw_table/draw_table.py`). Open that pull request yourself only if they ask.
+- which fields of `vibe/entry.toml` you could not fill and they must: usually `provider`, `runs_on`, `hardware`, `usd`, `basis`, `tokens`, `agent_minutes`, `human_turns`, `hand_written_lines`, `attempts`, and `commit` once they have pushed;
+- that the repository must be public, and that the row is added by a pull request to this repository with `vibe/entry.toml` copied to `entries/<handle>-<language>.toml` and the datasheet and the table redrawn (`python3 draw_table/draw_table.py`). Open that pull request yourself only if they ask.

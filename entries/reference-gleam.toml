@@ -1,4 +1,4 @@
-# One of the three clubs the challenge started from. Built before the rules
+# One of the three clubs the measurement started from. Built before the rules
 # existed, so the cost is what its author remembers and the protocol numbers
 # were never recorded.
 reference = true
@@ -10,9 +10,18 @@ licence = "Apache-2.0"
 
 [build]
 language = "Gleam"
-stack = "OTP 28, evoq, reckon_db, sqlite, cowboy"
+frameworks = "OTP 28, evoq, cowboy"
 harness = "OpenCode"
 models = ["DeepSeek v4"]
+
+[services]
+event_store = "reckon_db"
+read_model_store = "sqlite"
+fact_carrier = "Macula mesh"
+other_services = []
+
+[environment]
+runs_on = "hosted"
 
 [cost]
 usd = 17
@@ -21,5 +30,4 @@ basis = "billed"
 
 [result]
 stranger = "pass"
-mesh = true
 notes = "Not run."

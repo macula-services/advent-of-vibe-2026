@@ -1,6 +1,6 @@
 # The rules
 
-*This exists so two rows in the table can be compared: they built the same thing and counted cost the same way.*
+*This exists so two rows of the datasheet can be compared: they built the same thing and counted cost the same way.*
 
 There are five.
 
@@ -10,7 +10,7 @@ There are five.
 4. **Your language, your supporting services.** The language, the stack, the database, the broker, the harness, the models: all yours to choose. Use anything that helps you reach the goal.
 5. **One command starts it.** Your repository carries a compose file, or another mechanism of your choosing, that starts the club, the observer and whatever they need. Your entry names the command.
 
-That is all. The rest of this page says what your row in the table reports.
+That is all. The rest of this page says what the columns of the [datasheet](DATASHEET.csv) mean.
 
 ## What is measured
 
@@ -21,21 +21,35 @@ That is all. The rest of this page says what your row in the table reports.
 
 An unfinished club is a valid entry. Its row says how far it got.
 
-## What you chose
+## Your formula
 
-Each choice is a column in the table, so name it precisely.
+Each choice is a column, so that formulas can be compared. Name each one precisely, and the way others would name it: `PostgreSQL`, not `my database`.
 
 | Column | What to write |
 |---|---|
-| Language | The main language of the club |
-| Stack | Frameworks, the event store, the read-model store, what carries the facts. A few words |
-| Harness | The tool that drives the model: OpenCode, Claude Code, Cursor, Aider, your own loop |
-| Models | Every model that produced or reviewed code, with its version |
-| Add-ons | Everything else the agent was given: MCP servers, skills, rules files, templates, plugins, a corpus of conventions, the reference clubs |
+| `language` | The main language of the club |
+| `frameworks` | The frameworks and libraries that shape the code. A few words |
+| `event_store` | What keeps the event log: a product, or "my own, in" a database |
+| `read_model_store` | What keeps the read models |
+| `fact_carrier` | What carries the three facts from the club to the observer: a broker, the Macula mesh, a webhook |
+| `other_services` | Anything else that must run for the solution to work |
+| `harness` | The tool that drives the model: OpenCode, Claude Code, Cursor, Aider, your own loop |
+| `models` | Every model that produced or reviewed code, with its version |
+| `provider` | Who served the models: the vendor, a reseller, or `self` for your own machine |
+| `addons` | Everything else the agent was given: MCP servers, skills, rules files, templates, plugins, a corpus of conventions, the reference clubs |
+| `runs_on` | Where the models ran: `hosted`, `local` or `both` |
+| `hardware` | The machine the work ran on. For a local model, its GPU too |
+| `run_with` | The one command that starts the club and its observer |
+
+More columns may come as more formulas arrive. A new column never makes an old row wrong: the old row is empty there.
+
+## One row per run
+
+A row is one run of one formula. Run it again and you have a second row, with its own repository commit and its own cost. Several runs of the same formula are welcome: they show how much of a number is luck.
 
 ## Where it lives
 
-In a public repository that you choose and control. The entry names one commit of it, and every number in your row is about that commit. Any licence, or none. Your row is public.
+In a public repository that you choose and control. The entry names one commit of it, and every number in your row is about that commit. Any licence, or none. Your row is public, and so is the whole datasheet.
 
 ## How cost is counted
 
